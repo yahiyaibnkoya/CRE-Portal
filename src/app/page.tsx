@@ -132,46 +132,44 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* Main Container: Admin Login, Student/Parent Login & Add Centre Option Only */}
-      <main className="flex-1 flex flex-col justify-center py-12 sm:py-16 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto w-full text-center">
-        <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-cre-green-light border border-cre-green/30 text-cre-green text-xs font-bold mb-4 mx-auto">
+      {/* Main Container: Basic Information, Login Redirects & Add Centre Option */}
+      <main className="flex-1 flex flex-col justify-center py-10 sm:py-14 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto w-full text-center">
+        <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-cre-green-light border border-cre-green/30 text-cre-green text-xs font-bold mb-4 mx-auto">
           <span className="w-2 h-2 rounded-full bg-cre-green"></span>
-          <span>Wisdom Islamic Students Organization</span>
+          <span>Wisdom Islamic Students Organisation</span>
         </div>
 
-        <h1 className="text-3xl sm:text-4xl font-black text-cre-navy tracking-tight max-w-4xl mx-auto leading-tight">
+        <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-cre-navy tracking-tight max-w-3xl mx-auto leading-tight">
           Continuing Religious Education <span className="text-cre-green">(CRE)</span>
         </h1>
-        <p className="mt-2 text-xs sm:text-sm text-slate-500 max-w-2xl mx-auto">
-          Wisdom Islamic Students Organization
-        </p>
 
-        {/* 2 Login Cards: Admin Login & Student Login */}
-        <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6 text-left max-w-4xl mx-auto w-full">
+        {/* Basic Information & Core Purpose */}
+        <div className="mt-6 bg-white p-6 sm:p-7 rounded-2xl border border-cre-border shadow-xs text-left space-y-4">
+          <p className="text-xs sm:text-sm text-slate-700 leading-relaxed font-medium">
+            <span className="font-bold text-cre-navy">CRE</span> stands for <span className="font-bold text-cre-navy">Continuing Religious Education</span>, a structured religious education initiative conducted by the <span className="font-bold text-cre-green">Wisdom Islamic Students Organisation</span> in Kerala.
+          </p>
+          <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-cre-navy block mb-1">
+              Core Purpose
+            </span>
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+              Designed to provide systematic, authentic Islamic knowledge alongside secular schooling for students who have moved past primary madrasa education. It helps teenage students navigate life challenges while fostering strong moral values, honesty, and a solid sense of divine consciousness.
+            </p>
+          </div>
+        </div>
+
+        {/* 2 Login Redirect Cards: Admin Login & Student Login */}
+        <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-5 text-left w-full">
           {/* Card 1: Admin Login */}
-          <div className="bg-white rounded-2xl p-6 sm:p-7 border border-cre-border hover:border-cre-navy shadow-xs hover:shadow-lg transition-all flex flex-col justify-between group">
-            <div>
-              <div className="w-12 h-12 rounded-xl bg-cre-navy text-white flex items-center justify-center mb-4 shadow-sm">
+          <div className="bg-white rounded-2xl p-6 border border-cre-border hover:border-cre-navy shadow-xs hover:shadow-md transition-all flex flex-col justify-between group">
+            <div className="flex items-center space-x-4 mb-6">
+              <div className="w-12 h-12 rounded-xl bg-cre-navy text-white flex items-center justify-center shrink-0 shadow-sm">
                 <ShieldCheck className="w-6 h-6" />
               </div>
-              <h3 className="text-base sm:text-lg font-bold text-cre-navy">Admin Login</h3>
-              <p className="text-xs text-slate-500 mt-1 mb-4 leading-relaxed">
-                Single sign-in portal for all administrators. System automatically directs Super Admin and Centre Admins to their respective management workspaces.
-              </p>
-              <ul className="text-xs text-slate-600 space-y-2 mb-6">
-                <li className="flex items-center">
-                  <CheckCircle className="w-3.5 h-3.5 text-cre-green mr-2 shrink-0" />
-                  <span>Super Admin & Centre Admin Sign-in</span>
-                </li>
-                <li className="flex items-center">
-                  <CheckCircle className="w-3.5 h-3.5 text-cre-green mr-2 shrink-0" />
-                  <span>Direct Dashboard Access by Authorized Phone</span>
-                </li>
-                <li className="flex items-center">
-                  <CheckCircle className="w-3.5 h-3.5 text-cre-green mr-2 shrink-0" />
-                  <span>Student Admissions, Attendance & Fee Ledgers</span>
-                </li>
-              </ul>
+              <div>
+                <h3 className="text-base sm:text-lg font-bold text-cre-navy">Admin Login</h3>
+                <p className="text-xs text-slate-500">Super Admin & Centre Admin Portal</p>
+              </div>
             </div>
             <Link
               href="/login?tab=admin"
@@ -183,43 +181,29 @@ export default function HomePage() {
           </div>
 
           {/* Card 2: Student / Parent Login */}
-          <div className="bg-white rounded-2xl p-6 sm:p-7 border border-cre-border hover:border-cre-green shadow-xs hover:shadow-lg transition-all flex flex-col justify-between group">
-            <div>
-              <div className="w-12 h-12 rounded-xl bg-cre-green text-white flex items-center justify-center mb-4 shadow-sm shadow-cre-green/30">
+          <div className="bg-white rounded-2xl p-6 border border-cre-border hover:border-cre-green shadow-xs hover:shadow-md transition-all flex flex-col justify-between group">
+            <div className="flex items-center space-x-4 mb-6">
+              <div className="w-12 h-12 rounded-xl bg-cre-green text-white flex items-center justify-center shrink-0 shadow-sm shadow-cre-green/30">
                 <GraduationCap className="w-6 h-6" />
               </div>
-              <h3 className="text-base sm:text-lg font-bold text-cre-navy">Student Login</h3>
-              <p className="text-xs text-slate-500 mt-1 mb-4 leading-relaxed">
-                Direct phone-number-only access for students and parents to check attendance logs, fee payment statements, and examination marks.
-              </p>
-              <ul className="text-xs text-slate-600 space-y-2 mb-6">
-                <li className="flex items-center">
-                  <CheckCircle className="w-3.5 h-3.5 text-cre-green mr-2 shrink-0" />
-                  <span>Instant Mobile Number Access</span>
-                </li>
-                <li className="flex items-center">
-                  <CheckCircle className="w-3.5 h-3.5 text-cre-green mr-2 shrink-0" />
-                  <span>Attendance & Fee Statements</span>
-                </li>
-                <li className="flex items-center">
-                  <CheckCircle className="w-3.5 h-3.5 text-cre-green mr-2 shrink-0" />
-                  <span>Donate a Contact for New Admissions</span>
-                </li>
-              </ul>
+              <div>
+                <h3 className="text-base sm:text-lg font-bold text-cre-navy">Student / Parent Login</h3>
+                <p className="text-xs text-slate-500">Student & Parent Portal Access</p>
+              </div>
             </div>
             <Link
               href="/login?tab=student"
               className="w-full py-3 px-4 rounded-xl text-xs font-bold text-white bg-cre-green hover:bg-cre-green-hover transition-all flex items-center justify-between shadow-xs"
             >
-              <span>Student Login</span>
+              <span>Student / Parent Login</span>
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
         </div>
 
         {/* Option to Add Centre */}
-        <div className="mt-8 max-w-4xl mx-auto p-5 bg-white rounded-2xl border border-cre-border shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4 text-left w-full">
-          <div className="flex items-center space-x-3">
+        <div className="mt-8 p-5 bg-white rounded-2xl border border-cre-border shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4 text-left w-full">
+          <div className="flex items-center space-x-3.5">
             <div className="p-3 rounded-xl bg-cre-green-light text-cre-green shrink-0">
               <Building2 className="w-6 h-6" />
             </div>

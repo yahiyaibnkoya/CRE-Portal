@@ -23,6 +23,8 @@ import {
   Filter,
   Calendar,
   Phone,
+  SlidersHorizontal,
+  X,
 } from 'lucide-react';
 
 function SuperAdminReportsContent() {
@@ -35,6 +37,14 @@ function SuperAdminReportsContent() {
   const [reportType, setReportType] = useState<'class_attendance' | 'fee' | 'attendance' | 'financial' | 'exam'>(initialTab);
   const [selectedMonth, setSelectedMonth] = useState<string>('2026-11');
   const [copied, setCopied] = useState(false);
+
+  // Column Visibility Filters (Add/Remove content)
+  const [showAdmNo, setShowAdmNo] = useState(true);
+  const [showName, setShowName] = useState(true);
+  const [showPlace, setShowPlace] = useState(true);
+  const [showContact, setShowContact] = useState(true);
+  const [showDetails, setShowDetails] = useState(true);
+  const [showStatus, setShowStatus] = useState(true);
 
   const centers = dataService.getCenters();
   const currentCenterObj = centers.find((c) => c.id === selectedCenter);
@@ -140,31 +150,39 @@ function SuperAdminReportsContent() {
     return { totalPresent, totalAbsent, totalLeave, totalConductedMax, overallRate };
   }, [students, selectedMonth]);
 
-  // Generate WhatsApp text for current report
+  // Exam records
+  const allExams = useMemo(() => {
+    if (selectedCenter === 'ALL') {
+      const all: any[] = [];
+      centers.forEach((c) => all.push(...dataService.getExams(c.id)));
+      return all;
+    }
+    return dataService.getExams(selectedCenter);
+  }, [selectedCenter, centers]);
+
+  const allExamMarks = useMemo(() => {
+    if (selectedCenter === 'ALL') {
+      const all: any[] = [];
+      centers.forEach((c) => all.push(...dataService.getExamMarks(c.id)));
+      return all;
+    }
+    return dataService.getExamMarks(selectedCenter);
+  }, [selectedCenter, centers]);
+
+  // Generate WhatsApp text respecting column toggles
   const whatsAppText = useMemo(() => {
     if (reportType === 'class_attendance') {
       const { presentList, absentList, leaveList, total, turnoutRate } = classAttendanceData;
 
-      let text = `*CRE – CLASS ATTENDANCE REPORT*
-*Wisdom Islamic Students Organization*
-
-*Centre:* ${centerDisplayName}
-*Class Date:* ${selectedDate}
-*Attendance Turnout:* ${turnoutRate}% (${presentList.length}/${total} Present)
-
-*SUMMARY*
-Total Students: ${total}
-Present: ${presentList.length}
-Absent: ${absentList.length}
-On Leave: ${leaveList.length}
-
-*PRESENT STUDENTS (${presentList.length}):*`;
+      let text = `*CRE – CLASS ATTENDANCE REPORT*\n*Wisdom Islamic Students Organization*\n\n*Centre:* ${centerDisplayName}\n*Class Date:* ${selectedDate}\n*Attendance Turnout:* ${turnoutRate}% (${presentList.length}/${total} Present)\n\n*SUMMARY*\nTotal Students: ${total}\nPresent: ${presentList.length}\nAbsent: ${absentList.length}\nOn Leave: ${leaveList.length}\n\n*PRESENT STUDENTS (${presentList.length}):*`;
 
       if (presentList.length === 0) {
         text += '\n- None';
       } else {
         presentList.forEach((item, idx) => {
-          text += `\n${idx + 1}. ${item.student?.name || 'Student'} (${item.student?.admissionNumber || '—'}) - ${item.student?.place || '—'}`;
+          const admStr = showAdmNo && item.student?.admissionNumber ? ` (${item.student.admissionNumber})` : '';
+          const placeStr = showPlace && item.student?.place ? ` - ${item.student.place}` : '';
+          text += `\n${idx + 1}. ${item.student?.name || 'Student'}${admStr}${placeStr}`;
         });
       }
 
@@ -173,15 +191,18 @@ On Leave: ${leaveList.length}
         text += '\n- None';
       } else {
         absentList.forEach((item, idx) => {
-          const phone = item.student?.parentPhone || item.student?.studentPhone || 'No phone';
-          text += `\n${idx + 1}. ${item.student?.name || 'Student'} (${item.student?.admissionNumber || '—'}) - Parent: ${phone}`;
+          const admStr = showAdmNo && item.student?.admissionNumber ? ` (${item.student.admissionNumber})` : '';
+          const phone = item.student?.parentPhone || item.student?.studentPhone || '';
+          const phoneStr = showContact && phone ? ` - Parent: ${phone}` : '';
+          text += `\n${idx + 1}. ${item.student?.name || 'Student'}${admStr}${phoneStr}`;
         });
       }
 
       if (leaveList.length > 0) {
         text += `\n\n*ON LEAVE (${leaveList.length}):*`;
         leaveList.forEach((item, idx) => {
-          text += `\n${idx + 1}. ${item.student?.name || 'Student'} (${item.student?.admissionNumber || '—'}) - Reason: ${item.record.remarks || 'Sanctioned leave'}`;
+          const admStr = showAdmNo && item.student?.admissionNumber ? ` (${item.student.admissionNumber})` : '';
+          text += `\n${idx + 1}. ${item.student?.name || 'Student'}${admStr} - ${item.record.remarks || 'Sanctioned leave'}`;
         });
       }
 
@@ -197,73 +218,19 @@ On Leave: ${leaveList.length}
       const collectedTotal = monthlyFees.reduce((acc, f) => acc + (f.paidAmount || 0), 0);
       const outstandingTotal = monthlyFees.reduce((acc, f) => acc + (f.outstandingAmount || 0), 0);
 
-      return `*CRE – MONTHLY FEE REPORT*
-*Wisdom Islamic Students Organization*
-
-*Centre:* ${centerDisplayName}
-*Month:* ${selectedMonth}
-
-*FEE SUMMARY*
-Total Students: ${monthlyFees.length}
-Paid: ${paidCount}
-Partially Paid: ${partialCount}
-Unpaid: ${unpaidCount}
-
-*COLLECTION*
-Expected Amount: ${formatCurrency(expectedTotal)}
-Collected Amount: ${formatCurrency(collectedTotal)}
-Outstanding: ${formatCurrency(outstandingTotal)}
-
-*Generated on:* ${new Date().toLocaleDateString('en-IN')}`;
+      return `*CRE – MONTHLY FEE REPORT*\n*Wisdom Islamic Students Organization*\n\n*Scope:* ${centerDisplayName}\n*Month:* ${selectedMonth}\n\n*FEE SUMMARY*\nTotal Students: ${monthlyFees.length}\nPaid: ${paidCount}\nPartially Paid: ${partialCount}\nUnpaid: ${unpaidCount}\n\n*COLLECTION*\nExpected Amount: ${formatCurrency(expectedTotal)}\nCollected Amount: ${formatCurrency(collectedTotal)}\nOutstanding: ${formatCurrency(outstandingTotal)}\n\n*Generated on:* ${new Date().toLocaleDateString('en-IN')}`;
     }
 
     if (reportType === 'attendance') {
-      return `*CRE – ATTENDANCE REPORT*
-*Wisdom Islamic Students Organization*
-
-*Centre:* ${centerDisplayName}
-*Month:* ${selectedMonth}
-
-*ATTENDANCE SUMMARY*
-Total Classes Conducted: ${attendanceSummary.totalConductedMax}
-Present Sessions: ${attendanceSummary.totalPresent}
-Absent Sessions: ${attendanceSummary.totalAbsent}
-Leave Records: ${attendanceSummary.totalLeave}
-Overall Attendance: ${attendanceSummary.overallRate}%
-
-*Generated on:* ${new Date().toLocaleDateString('en-IN')}`;
+      return `*CRE – MONTHLY ATTENDANCE STATEMENT*\n*Wisdom Islamic Students Organization*\n\n*Scope:* ${centerDisplayName}\n*Month:* ${selectedMonth}\n\n*ATTENDANCE SUMMARY*\nConducted Sessions: ${attendanceSummary.totalConductedMax}\nPresent Sessions: ${attendanceSummary.totalPresent}\nAbsent Sessions: ${attendanceSummary.totalAbsent}\nOverall Attendance: ${attendanceSummary.overallRate}%\n\n*Generated on:* ${new Date().toLocaleDateString('en-IN')}`;
     }
 
     if (reportType === 'financial') {
-      return `*CRE – FINANCIAL REPORT*
-*Wisdom Islamic Students Organization*
-
-*Centre:* ${centerDisplayName}
-*Month:* ${selectedMonth}
-
-*INCOME*
-Fee Collection: ${formatCurrency(financialSummary.totalFeeIncome)}
-Donations: ${formatCurrency(financialSummary.totalDonationIncome)}
-*Total Income:* ${formatCurrency(financialSummary.totalIncome)}
-
-*EXPENDITURE*
-Weekly Class Expenses: ${formatCurrency(financialSummary.totalWeeklyExpense)}
-Other Operational: ${formatCurrency(financialSummary.totalOtherExpense)}
-*Total Expenditure:* ${formatCurrency(financialSummary.totalExpenses)}
-
-*NET BALANCE:* ${formatCurrency(financialSummary.netBalance)}
-
-*Generated on:* ${new Date().toLocaleDateString('en-IN')}`;
+      return `*CRE – FINANCIAL CONSOLIDATED REPORT*\n*Wisdom Islamic Students Organization*\n\n*Scope:* ${centerDisplayName}\n*Month:* ${selectedMonth}\n\n*INCOME*\nFee Collections: ${formatCurrency(financialSummary.totalFeeIncome)}\nDonations: ${formatCurrency(financialSummary.totalDonationIncome)}\n*Total Income:* ${formatCurrency(financialSummary.totalIncome)}\n\n*EXPENDITURE*\nWeekly Class Expenses: ${formatCurrency(financialSummary.totalWeeklyExpense)}\nOther Operational: ${formatCurrency(financialSummary.totalOtherExpense)}\n*Total Expenses:* ${formatCurrency(financialSummary.totalExpenses)}\n\n*NET BALANCE:* ${formatCurrency(financialSummary.netBalance)}\n\n*Generated on:* ${new Date().toLocaleDateString('en-IN')}`;
     }
 
     // Exam Report
-    return `*CRE – EXAMINATION REPORT*
-*Wisdom Islamic Students Organization*
-
-*Centre:* ${centerDisplayName}
-*Active Students:* ${students.filter((s) => s.status === 'Active').length}
-
-*Generated on:* ${new Date().toLocaleDateString('en-IN')}`;
+    return `*CRE – STATEWIDE EXAMINATION REPORT*\n*Wisdom Islamic Students Organization*\n\n*Scope:* ${centerDisplayName}\n*Total Exams Recorded:* ${allExams.length}\n*Evaluated Marks:* ${allExamMarks.length}\n\n*Generated on:* ${new Date().toLocaleDateString('en-IN')}`;
   }, [
     reportType,
     centerDisplayName,
@@ -273,7 +240,11 @@ Other Operational: ${formatCurrency(financialSummary.totalOtherExpense)}
     monthlyFees,
     financialSummary,
     attendanceSummary,
-    students,
+    allExams,
+    allExamMarks,
+    showAdmNo,
+    showPlace,
+    showContact,
   ]);
 
   const handleCopyText = async () => {
@@ -291,44 +262,44 @@ Other Operational: ${formatCurrency(financialSummary.totalOtherExpense)}
 
   const handleDownloadPdf = () => {
     if (reportType === 'class_attendance') {
-      const columns = ['#', 'Adm No', 'Student Name', 'Place', 'Parent Phone', 'Status', 'Remarks'];
+      const columns = ['#'];
+      if (showAdmNo) columns.push('Adm No');
+      if (showName) columns.push('Student Name');
+      if (showPlace) columns.push('Place');
+      if (showContact) columns.push('Parent Phone');
+      if (showStatus) columns.push('Status');
+
       let counter = 1;
       const rows: (string | number)[][] = [];
 
       classAttendanceData.absentList.forEach((item) => {
-        rows.push([
-          counter++,
-          item.student?.admissionNumber || '—',
-          item.student?.name || 'Student',
-          item.student?.place || '—',
-          item.student?.parentPhone || '—',
-          'ABSENT',
-          'Absent from weekly class',
-        ]);
+        const row: (string | number)[] = [counter++];
+        if (showAdmNo) row.push(item.student?.admissionNumber || '—');
+        if (showName) row.push(item.student?.name || 'Student');
+        if (showPlace) row.push(item.student?.place || '—');
+        if (showContact) row.push(item.student?.parentPhone || '—');
+        if (showStatus) row.push('ABSENT');
+        rows.push(row);
       });
 
       classAttendanceData.presentList.forEach((item) => {
-        rows.push([
-          counter++,
-          item.student?.admissionNumber || '—',
-          item.student?.name || 'Student',
-          item.student?.place || '—',
-          item.student?.parentPhone || '—',
-          'PRESENT',
-          item.record.remarks || 'Attended',
-        ]);
+        const row: (string | number)[] = [counter++];
+        if (showAdmNo) row.push(item.student?.admissionNumber || '—');
+        if (showName) row.push(item.student?.name || 'Student');
+        if (showPlace) row.push(item.student?.place || '—');
+        if (showContact) row.push(item.student?.parentPhone || '—');
+        if (showStatus) row.push('PRESENT');
+        rows.push(row);
       });
 
       classAttendanceData.leaveList.forEach((item) => {
-        rows.push([
-          counter++,
-          item.student?.admissionNumber || '—',
-          item.student?.name || 'Student',
-          item.student?.place || '—',
-          item.student?.parentPhone || '—',
-          'LEAVE',
-          item.record.remarks || 'Sanctioned leave',
-        ]);
+        const row: (string | number)[] = [counter++];
+        if (showAdmNo) row.push(item.student?.admissionNumber || '—');
+        if (showName) row.push(item.student?.name || 'Student');
+        if (showPlace) row.push(item.student?.place || '—');
+        if (showContact) row.push(item.student?.parentPhone || '—');
+        if (showStatus) row.push('LEAVE');
+        rows.push(row);
       });
 
       generatePdfReport({
@@ -343,48 +314,106 @@ Other Operational: ${formatCurrency(financialSummary.totalOtherExpense)}
         ],
         columns,
         rows,
-        fileName: `${centerDisplayName}_class_attendance_${selectedDate}`,
+        fileName: `CRE_class_attendance_${selectedDate}`,
       });
     } else if (reportType === 'fee') {
-      const columns = ['Adm No', 'Student Name', 'Expected', 'Paid', 'Outstanding', 'Status'];
+      const columns = ['#'];
+      if (showAdmNo) columns.push('Adm No');
+      if (showName) columns.push('Student Name');
+      if (showPlace) columns.push('Place');
+      if (showDetails) {
+        columns.push('Expected Fee');
+        columns.push('Paid Amount');
+        columns.push('Balance Due');
+      }
+      if (showStatus) columns.push('Status');
+
+      let counter = 1;
       const rows = monthlyFees.map((f) => {
         const st = dataService.getStudentById(f.studentId);
-        return [
-          st?.admissionNumber || '—',
-          st?.name || 'Student',
-          formatCurrency(f.expectedFee),
-          formatCurrency(f.paidAmount),
-          formatCurrency(f.outstandingAmount),
-          f.status,
-        ];
+        const row: (string | number)[] = [counter++];
+        if (showAdmNo) row.push(st?.admissionNumber || '—');
+        if (showName) row.push(st?.name || 'Student');
+        if (showPlace) row.push(st?.place || '—');
+        if (showDetails) {
+          row.push(formatCurrency(f.expectedFee));
+          row.push(formatCurrency(f.paidAmount));
+          row.push(formatCurrency(f.outstandingAmount));
+        }
+        if (showStatus) row.push(f.status);
+        return row;
       });
 
       generatePdfReport({
-        title: `Monthly Fee Collection Report (${selectedMonth})`,
+        title: `Monthly Fee Report (${selectedMonth})`,
         centerName: centerDisplayName,
         period: selectedMonth,
         summaryItems: [
-          { label: 'Total Students', value: monthlyFees.length },
+          { label: 'Total Enrolled', value: monthlyFees.length },
           { label: 'Collected Fee', value: formatCurrency(financialSummary.totalFeeIncome) },
+          { label: 'Outstanding', value: formatCurrency(monthlyFees.reduce((a, b) => a + (b.outstandingAmount || 0), 0)) },
         ],
         columns,
         rows,
-        fileName: `cre_fee_report_${selectedMonth}`,
+        fileName: `CRE_fee_report_${selectedMonth}`,
+      });
+    } else if (reportType === 'attendance') {
+      const columns = ['#'];
+      if (showAdmNo) columns.push('Adm No');
+      if (showName) columns.push('Student Name');
+      if (showPlace) columns.push('Place');
+      if (showDetails) {
+        columns.push('Conducted');
+        columns.push('Present');
+        columns.push('Absent');
+        columns.push('Leave');
+      }
+      if (showStatus) columns.push('Rate %');
+
+      let counter = 1;
+      const rows = students.map((s) => {
+        const att = dataService.calculateStudentAttendance(s.id, s.centerId, selectedMonth);
+        const row: (string | number)[] = [counter++];
+        if (showAdmNo) row.push(s.admissionNumber);
+        if (showName) row.push(s.name);
+        if (showPlace) row.push(s.place || '—');
+        if (showDetails) {
+          row.push(att.totalConducted);
+          row.push(att.present);
+          row.push(att.absent);
+          row.push(att.leave);
+        }
+        if (showStatus) row.push(`${att.percentage}%`);
+        return row;
+      });
+
+      generatePdfReport({
+        title: `Monthly Attendance Statement (${selectedMonth})`,
+        centerName: centerDisplayName,
+        period: selectedMonth,
+        summaryItems: [
+          { label: 'Overall Rate', value: `${attendanceSummary.overallRate}%` },
+          { label: 'Present Sessions', value: attendanceSummary.totalPresent },
+          { label: 'Absent Sessions', value: attendanceSummary.totalAbsent },
+        ],
+        columns,
+        rows,
+        fileName: `CRE_attendance_statement_${selectedMonth}`,
       });
     } else if (reportType === 'financial') {
-      const columns = ['Head / Category', 'Type', 'Amount (INR)'];
+      const columns = ['Accounting Head', 'Type', 'Amount (INR)'];
       const rows = [
-        ['Fee Income', 'Income', formatCurrency(financialSummary.totalFeeIncome)],
-        ['Donation Income', 'Income', formatCurrency(financialSummary.totalDonationIncome)],
+        ['Fee Collections', 'Income', formatCurrency(financialSummary.totalFeeIncome)],
+        ['Donations Received', 'Income', formatCurrency(financialSummary.totalDonationIncome)],
         ['TOTAL INCOME', 'Income', formatCurrency(financialSummary.totalIncome)],
-        ['Weekly Session Expenses', 'Expenditure', formatCurrency(financialSummary.totalWeeklyExpense)],
+        ['Weekly Class Expenses', 'Expenditure', formatCurrency(financialSummary.totalWeeklyExpense)],
         ['Other Operational Expenses', 'Expenditure', formatCurrency(financialSummary.totalOtherExpense)],
         ['TOTAL EXPENDITURE', 'Expenditure', formatCurrency(financialSummary.totalExpenses)],
         ['NET BALANCE', 'Balance', formatCurrency(financialSummary.netBalance)],
       ];
 
       generatePdfReport({
-        title: `Income & Expenditure Statement (${selectedMonth})`,
+        title: `Consolidated Financial Statement (${selectedMonth})`,
         centerName: centerDisplayName,
         period: selectedMonth,
         summaryItems: [
@@ -394,35 +423,48 @@ Other Operational: ${formatCurrency(financialSummary.totalOtherExpense)}
         ],
         columns,
         rows,
-        fileName: `cre_financial_report_${selectedMonth}`,
+        fileName: `CRE_finance_statement_${selectedMonth}`,
       });
-    } else if (reportType === 'attendance') {
-      const columns = ['Adm No', 'Student Name', 'Conducted', 'Present', 'Absent', 'Leave', 'Percentage'];
-      const rows = students.filter((s) => s.status === 'Active').map((s) => {
-        const att = dataService.calculateStudentAttendance(s.id, s.centerId, selectedMonth);
-        return [
-          s.admissionNumber,
-          s.name,
-          att.totalConducted,
-          att.present,
-          att.absent,
-          att.leave,
-          `${att.percentage}%`,
-        ];
+    } else if (reportType === 'exam') {
+      const columns = ['#'];
+      if (showAdmNo) columns.push('Adm No');
+      if (showName) columns.push('Student Name');
+      if (showPlace) columns.push('Place');
+      if (showDetails) {
+        columns.push('Exam Title');
+        columns.push('Score');
+        columns.push('Max Marks');
+      }
+      if (showStatus) columns.push('Result');
+
+      let counter = 1;
+      const rows = allExamMarks.map((m) => {
+        const st = dataService.getStudentById(m.studentId);
+        const ex = dataService.getExamById(m.examId);
+        const row: (string | number)[] = [counter++];
+        if (showAdmNo) row.push(st?.admissionNumber || '—');
+        if (showName) row.push(st?.name || 'Student');
+        if (showPlace) row.push(st?.place || '—');
+        if (showDetails) {
+          row.push(ex?.name || 'Exam');
+          row.push(m.marksObtained);
+          row.push(m.maxMarks);
+        }
+        if (showStatus) row.push(m.isPassed ? 'PASSED' : 'NEEDS IMPROVEMENT');
+        return row;
       });
 
       generatePdfReport({
-        title: `Monthly Attendance Report (${selectedMonth})`,
+        title: `Statewide Examination Statement`,
         centerName: centerDisplayName,
-        period: selectedMonth,
+        period: 'All Records',
         summaryItems: [
-          { label: 'Overall Rate', value: `${attendanceSummary.overallRate}%` },
-          { label: 'Total Present', value: attendanceSummary.totalPresent },
-          { label: 'Total Absent', value: attendanceSummary.totalAbsent },
+          { label: 'Total Exams', value: allExams.length },
+          { label: 'Evaluated Marks', value: allExamMarks.length },
         ],
         columns,
         rows,
-        fileName: `cre_attendance_report_${selectedMonth}`,
+        fileName: `CRE_exam_records`,
       });
     }
   };
@@ -433,14 +475,14 @@ Other Operational: ${formatCurrency(financialSummary.totalOtherExpense)}
         {/* Header */}
         <div className="pb-2 border-b border-cre-border">
           <h1 className="text-xl sm:text-2xl font-black text-cre-navy">
-            Reports & Statements
+            Statewide Reports & Intelligence
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Instant on-screen viewing, WhatsApp text sharing, and client-side PDF downloads
+            Centralized multi-centre reporting with dynamic field filtering, WhatsApp summaries, and PDF generation
           </p>
         </div>
 
-        {/* Report Type Selector Tabs */}
+        {/* Tab Selector */}
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 bg-slate-100 p-1.5 rounded-2xl">
           <button
             type="button"
@@ -452,7 +494,7 @@ Other Operational: ${formatCurrency(financialSummary.totalOtherExpense)}
             }`}
           >
             <CalendarCheck className="w-4 h-4 mr-1.5" />
-            <span>Class Attendance Report</span>
+            <span>Class Attendance</span>
           </button>
 
           <button
@@ -478,7 +520,7 @@ Other Operational: ${formatCurrency(financialSummary.totalOtherExpense)}
             }`}
           >
             <IndianRupee className="w-4 h-4 mr-1.5" />
-            <span>Monthly Fee Report</span>
+            <span>Fee Statement</span>
           </button>
 
           <button
@@ -491,7 +533,7 @@ Other Operational: ${formatCurrency(financialSummary.totalOtherExpense)}
             }`}
           >
             <Receipt className="w-4 h-4 mr-1.5" />
-            <span>Financial Statement</span>
+            <span>Financial Accounts</span>
           </button>
 
           <button
@@ -504,7 +546,7 @@ Other Operational: ${formatCurrency(financialSummary.totalOtherExpense)}
             }`}
           >
             <GraduationCap className="w-4 h-4 mr-1.5" />
-            <span>Exam Report</span>
+            <span>Exam Marksheet</span>
           </button>
         </div>
 
@@ -545,6 +587,10 @@ Other Operational: ${formatCurrency(financialSummary.totalOtherExpense)}
                   ))}
                   {availableDates.length === 0 && <option value="2026-11-08">2026-11-08</option>}
                 </select>
+              </div>
+            ) : reportType === 'exam' ? (
+              <div className="text-xs font-bold text-cre-navy bg-white px-3.5 py-2 rounded-xl border border-cre-border">
+                All Examination Records
               </div>
             ) : (
               <div className="flex items-center space-x-2 bg-white px-3 py-2 rounded-xl border border-cre-border text-xs font-semibold text-slate-800">
@@ -590,7 +636,104 @@ Other Operational: ${formatCurrency(financialSummary.totalOtherExpense)}
           </div>
         </div>
 
-        {/* DEDICATED ON-SCREEN VIEW FOR CLASS ATTENDANCE REPORT */}
+        {/* COLUMN FILTERING BAR (Toggle fields to add / remove) */}
+        {reportType !== 'financial' && (
+          <div className="bg-white p-4 rounded-2xl border border-cre-border shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+              <div className="flex items-center space-x-2 text-xs font-bold text-cre-navy uppercase tracking-wider">
+                <SlidersHorizontal className="w-4 h-4 text-cre-green" />
+                <span>Filter Report Columns & Content</span>
+              </div>
+              <span className="text-[11px] text-slate-400">
+                Click any column to include or remove it from the table, PDF export, and WhatsApp text
+              </span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowAdmNo(!showAdmNo)}
+                className={`inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  showAdmNo
+                    ? 'bg-cre-green text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-400 line-through hover:bg-slate-200'
+                }`}
+              >
+                {showAdmNo ? <CheckCircle className="w-3.5 h-3.5 mr-1.5" /> : <X className="w-3.5 h-3.5 mr-1.5" />}
+                Admission No.
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowName(!showName)}
+                className={`inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  showName
+                    ? 'bg-cre-green text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-400 line-through hover:bg-slate-200'
+                }`}
+              >
+                {showName ? <CheckCircle className="w-3.5 h-3.5 mr-1.5" /> : <X className="w-3.5 h-3.5 mr-1.5" />}
+                Student Name
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowPlace(!showPlace)}
+                className={`inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  showPlace
+                    ? 'bg-cre-green text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-400 line-through hover:bg-slate-200'
+                }`}
+              >
+                {showPlace ? <CheckCircle className="w-3.5 h-3.5 mr-1.5" /> : <X className="w-3.5 h-3.5 mr-1.5" />}
+                Place / Location
+              </button>
+
+              {reportType === 'class_attendance' && (
+                <button
+                  type="button"
+                  onClick={() => setShowContact(!showContact)}
+                  className={`inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    showContact
+                      ? 'bg-cre-green text-white shadow-xs'
+                      : 'bg-slate-100 text-slate-400 line-through hover:bg-slate-200'
+                  }`}
+                >
+                  {showContact ? <CheckCircle className="w-3.5 h-3.5 mr-1.5" /> : <X className="w-3.5 h-3.5 mr-1.5" />}
+                  Parent Phone / Contact
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setShowDetails(!showDetails)}
+                className={`inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  showDetails
+                    ? 'bg-cre-green text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-400 line-through hover:bg-slate-200'
+                }`}
+              >
+                {showDetails ? <CheckCircle className="w-3.5 h-3.5 mr-1.5" /> : <X className="w-3.5 h-3.5 mr-1.5" />}
+                {reportType === 'fee' ? 'Fee Amounts' : reportType === 'attendance' ? 'Session Numbers' : reportType === 'exam' ? 'Exam & Marks' : 'Detailed Records'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowStatus(!showStatus)}
+                className={`inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  showStatus
+                    ? 'bg-cre-green text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-400 line-through hover:bg-slate-200'
+                }`}
+              >
+                {showStatus ? <CheckCircle className="w-3.5 h-3.5 mr-1.5" /> : <X className="w-3.5 h-3.5 mr-1.5" />}
+                Status / Percentage
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* 1. CLASS ATTENDANCE VIEW */}
         {reportType === 'class_attendance' && (
           <div className="space-y-6">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -612,135 +755,448 @@ Other Operational: ${formatCurrency(financialSummary.totalOtherExpense)}
               </div>
             </div>
 
-            {/* PRESENT & ABSENT STUDENTS LISTS */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* PRESENT STUDENTS LIST */}
-              <div className="bg-white rounded-2xl border border-cre-border shadow-xs overflow-hidden">
-                <div className="bg-cre-green-light px-5 py-3.5 border-b border-cre-green/30 flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <CheckCircle2 className="w-4 h-4 text-cre-green" />
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-cre-green">
-                      Present Students List ({classAttendanceData.presentList.length})
-                    </h3>
-                  </div>
-                  <span className="text-[10px] font-bold text-cre-green bg-white px-2 py-0.5 rounded-full border border-cre-green/30">
-                    Attended Class
-                  </span>
-                </div>
-
-                <div className="p-4">
-                  {classAttendanceData.presentList.length > 0 ? (
-                    <div className="divide-y divide-slate-100">
-                      {classAttendanceData.presentList.map((item, idx) => (
-                        <div key={item.record.id} className="py-2.5 flex items-center justify-between text-xs">
-                          <div className="flex items-center space-x-3">
-                            <span className="w-5 text-slate-400 font-bold">{idx + 1}.</span>
-                            <div>
-                              <h4 className="font-bold text-slate-900">{item.student?.name || 'Student'}</h4>
-                              <p className="text-[11px] text-slate-500">
-                                {item.student?.admissionNumber} • {item.student?.place || 'Local'}
-                              </p>
-                            </div>
-                          </div>
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cre-green-light text-cre-green border border-cre-green/20">
-                            Present
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="py-8 text-center text-slate-400 text-xs">
-                      No present records found for this date.
-                    </div>
-                  )}
-                </div>
+            <div className="bg-white rounded-2xl border border-cre-border shadow-xs overflow-hidden">
+              <div className="p-4 border-b border-cre-border flex items-center justify-between">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-cre-navy">
+                  Class Attendance Turnout – {selectedDate} ({centerDisplayName})
+                </h3>
+                <span className="text-[11px] text-slate-500 font-medium">
+                  {classAttendanceData.records.length} Students Logged
+                </span>
               </div>
 
-              {/* ABSENT STUDENTS LIST */}
-              <div className="bg-white rounded-2xl border border-cre-border shadow-xs overflow-hidden">
-                <div className="bg-red-50 px-5 py-3.5 border-b border-red-200 flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <XCircle className="w-4 h-4 text-red-600" />
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-red-700">
-                      Absent Students List ({classAttendanceData.absentList.length})
-                    </h3>
-                  </div>
-                  <span className="text-[10px] font-bold text-red-700 bg-white px-2 py-0.5 rounded-full border border-red-200">
-                    Follow-up Required
-                  </span>
-                </div>
-
-                <div className="p-4">
-                  {classAttendanceData.absentList.length > 0 ? (
-                    <div className="divide-y divide-slate-100">
-                      {classAttendanceData.absentList.map((item, idx) => {
-                        const parentPhone = item.student?.parentPhone || item.student?.studentPhone || '';
-                        return (
-                          <div key={item.record.id} className="py-2.5 flex items-center justify-between text-xs">
-                            <div className="flex items-center space-x-3">
-                              <span className="w-5 text-slate-400 font-bold">{idx + 1}.</span>
-                              <div>
-                                <h4 className="font-bold text-slate-900">{item.student?.name || 'Student'}</h4>
-                                <p className="text-[11px] text-slate-500">
-                                  {item.student?.admissionNumber} • Parent: {item.student?.parentName || 'Parent'}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              {parentPhone && (
-                                <a
-                                  href={`https://wa.me/91${parentPhone}?text=${encodeURIComponent(
-                                    `Assalamu Alaikum. This is regarding CRE class on ${selectedDate}. Your child ${item.student?.name} was marked absent.`
-                                  )}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="p-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
-                                  title="Contact Parent on WhatsApp"
-                                >
-                                  <Phone className="w-3.5 h-3.5" />
-                                </a>
-                              )}
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-700 border border-red-200">
-                                Absent
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 border-b border-cre-border text-[11px] font-bold text-cre-navy uppercase">
+                    <tr>
+                      <th className="py-3 px-4">#</th>
+                      {showAdmNo && <th className="py-3 px-4">Adm No</th>}
+                      {showName && <th className="py-3 px-4">Student Name</th>}
+                      {showPlace && <th className="py-3 px-4">Place</th>}
+                      {showContact && <th className="py-3 px-4">Parent Phone</th>}
+                      {showStatus && <th className="py-3 px-4 text-right">Attendance Status</th>}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-cre-border">
+                    {classAttendanceData.records.map((r, idx) => {
+                      const st = dataService.getStudentById(r.studentId);
+                      return (
+                        <tr key={r.id} className="hover:bg-slate-50/60 transition-colors">
+                          <td className="py-3 px-4 text-slate-400 font-bold">{idx + 1}</td>
+                          {showAdmNo && (
+                            <td className="py-3 px-4 font-mono font-bold text-cre-navy">
+                              {st?.admissionNumber || '—'}
+                            </td>
+                          )}
+                          {showName && (
+                            <td className="py-3 px-4 font-bold text-slate-900">{st?.name || 'Student'}</td>
+                          )}
+                          {showPlace && (
+                            <td className="py-3 px-4 text-slate-600">{st?.place || '—'}</td>
+                          )}
+                          {showContact && (
+                            <td className="py-3 px-4 font-mono text-slate-600">
+                              {st?.parentPhone || st?.studentPhone || '—'}
+                            </td>
+                          )}
+                          {showStatus && (
+                            <td className="py-3 px-4 text-right">
+                              <span
+                                className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                  r.status === 'Present'
+                                    ? 'bg-cre-green-light text-cre-green border border-cre-green/30'
+                                    : r.status === 'Absent'
+                                    ? 'bg-red-50 text-red-700 border border-red-200'
+                                    : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                }`}
+                              >
+                                {r.status}
                               </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="py-8 text-center text-cre-green text-xs font-semibold">
-                      ✓ Excellent! No students were absent on this class date.
-                    </div>
-                  )}
-                </div>
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 2. MONTHLY ATTENDANCE STATEMENT VIEW */}
+        {reportType === 'attendance' && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div className="bg-white p-4 rounded-2xl border border-cre-border shadow-xs">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Conducted Sessions</span>
+                <span className="text-xl font-black text-cre-navy mt-1 block">{attendanceSummary.totalConductedMax}</span>
+              </div>
+              <div className="bg-cre-green-light p-4 rounded-2xl border border-cre-green/30 shadow-xs">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-cre-green block">Present Turnout</span>
+                <span className="text-xl font-black text-cre-green mt-1 block">{attendanceSummary.totalPresent}</span>
+              </div>
+              <div className="bg-red-50 p-4 rounded-2xl border border-red-200 shadow-xs">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-red-600 block">Absent Count</span>
+                <span className="text-xl font-black text-red-700 mt-1 block">{attendanceSummary.totalAbsent}</span>
+              </div>
+              <div className="bg-white p-4 rounded-2xl border border-cre-border shadow-xs">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Average Attendance</span>
+                <span className="text-xl font-black text-cre-navy mt-1 block">{attendanceSummary.overallRate}%</span>
               </div>
             </div>
 
-            {/* LEAVE STUDENTS (IF ANY) */}
-            {classAttendanceData.leaveList.length > 0 && (
-              <div className="bg-white rounded-2xl border border-cre-border shadow-xs p-5">
-                <div className="flex items-center space-x-2 mb-3">
-                  <AlertCircle className="w-4 h-4 text-amber-500" />
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                    Sanctioned Leave Students ({classAttendanceData.leaveList.length})
-                  </h3>
-                </div>
-                <div className="divide-y divide-slate-100">
-                  {classAttendanceData.leaveList.map((item, idx) => (
-                    <div key={item.record.id} className="py-2 flex items-center justify-between text-xs">
-                      <div>
-                        <span className="font-bold text-slate-800">{item.student?.name}</span>
-                        <span className="text-slate-400 ml-2">({item.student?.admissionNumber})</span>
-                      </div>
-                      <span className="text-slate-500 italic text-[11px]">
-                        Reason: {item.record.remarks || 'Prior leave approved'}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+            <div className="bg-white rounded-2xl border border-cre-border shadow-xs overflow-hidden">
+              <div className="p-4 border-b border-cre-border">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-cre-navy">
+                  Statewide Monthly Attendance Statement ({selectedMonth})
+                </h3>
               </div>
-            )}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 border-b border-cre-border text-[11px] font-bold text-cre-navy uppercase">
+                    <tr>
+                      <th className="py-3 px-4">#</th>
+                      {showAdmNo && <th className="py-3 px-4">Adm No</th>}
+                      {showName && <th className="py-3 px-4">Student Name</th>}
+                      {showPlace && <th className="py-3 px-4">Place</th>}
+                      {showDetails && (
+                        <>
+                          <th className="py-3 px-4">Conducted</th>
+                          <th className="py-3 px-4">Present</th>
+                          <th className="py-3 px-4">Absent</th>
+                          <th className="py-3 px-4">Leave</th>
+                        </>
+                      )}
+                      {showStatus && <th className="py-3 px-4 text-right">Attendance Rate</th>}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-cre-border">
+                    {students.map((s, idx) => {
+                      const att = dataService.calculateStudentAttendance(s.id, s.centerId, selectedMonth);
+                      return (
+                        <tr key={s.id} className="hover:bg-slate-50/60 transition-colors">
+                          <td className="py-3 px-4 text-slate-400 font-bold">{idx + 1}</td>
+                          {showAdmNo && (
+                            <td className="py-3 px-4 font-mono font-bold text-cre-navy">{s.admissionNumber}</td>
+                          )}
+                          {showName && (
+                            <td className="py-3 px-4 font-bold text-slate-900">{s.name}</td>
+                          )}
+                          {showPlace && (
+                            <td className="py-3 px-4 text-slate-600">{s.place || '—'}</td>
+                          )}
+                          {showDetails && (
+                            <>
+                              <td className="py-3 px-4 text-slate-700 font-semibold">{att.totalConducted}</td>
+                              <td className="py-3 px-4 text-cre-green font-bold">{att.present}</td>
+                              <td className="py-3 px-4 text-red-600 font-semibold">{att.absent}</td>
+                              <td className="py-3 px-4 text-amber-600">{att.leave}</td>
+                            </>
+                          )}
+                          {showStatus && (
+                            <td className="py-3 px-4 text-right">
+                              <span
+                                className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                  att.percentage >= 80
+                                    ? 'bg-cre-green-light text-cre-green'
+                                    : att.percentage >= 60
+                                    ? 'bg-amber-50 text-amber-700'
+                                    : 'bg-red-50 text-red-700'
+                                }`}
+                              >
+                                {att.percentage}%
+                              </span>
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 3. MONTHLY FEE STATEMENT VIEW */}
+        {reportType === 'fee' && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div className="bg-white p-4 rounded-2xl border border-cre-border shadow-xs">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Total Expected</span>
+                <span className="text-xl font-black text-cre-navy mt-1 block">
+                  {formatCurrency(monthlyFees.reduce((acc, f) => acc + (f.expectedFee || 0), 0))}
+                </span>
+              </div>
+              <div className="bg-cre-green-light p-4 rounded-2xl border border-cre-green/30 shadow-xs">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-cre-green block">Collected Fee</span>
+                <span className="text-xl font-black text-cre-green mt-1 block">
+                  {formatCurrency(monthlyFees.reduce((acc, f) => acc + (f.paidAmount || 0), 0))}
+                </span>
+              </div>
+              <div className="bg-amber-50 p-4 rounded-2xl border border-amber-200 shadow-xs">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 block">Outstanding</span>
+                <span className="text-xl font-black text-amber-800 mt-1 block">
+                  {formatCurrency(monthlyFees.reduce((acc, f) => acc + (f.outstandingAmount || 0), 0))}
+                </span>
+              </div>
+              <div className="bg-white p-4 rounded-2xl border border-cre-border shadow-xs">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Total Enrolled</span>
+                <span className="text-xl font-black text-cre-navy mt-1 block">{monthlyFees.length}</span>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-cre-border shadow-xs overflow-hidden">
+              <div className="p-4 border-b border-cre-border">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-cre-navy">
+                  Monthly Student Fee Register ({selectedMonth})
+                </h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 border-b border-cre-border text-[11px] font-bold text-cre-navy uppercase">
+                    <tr>
+                      <th className="py-3 px-4">#</th>
+                      {showAdmNo && <th className="py-3 px-4">Adm No</th>}
+                      {showName && <th className="py-3 px-4">Student Name</th>}
+                      {showPlace && <th className="py-3 px-4">Place</th>}
+                      {showDetails && (
+                        <>
+                          <th className="py-3 px-4">Expected</th>
+                          <th className="py-3 px-4">Paid</th>
+                          <th className="py-3 px-4">Outstanding</th>
+                        </>
+                      )}
+                      {showStatus && <th className="py-3 px-4 text-right">Fee Status</th>}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-cre-border">
+                    {monthlyFees.map((f, idx) => {
+                      const st = dataService.getStudentById(f.studentId);
+                      return (
+                        <tr key={f.id} className="hover:bg-slate-50/60 transition-colors">
+                          <td className="py-3 px-4 text-slate-400 font-bold">{idx + 1}</td>
+                          {showAdmNo && (
+                            <td className="py-3 px-4 font-mono font-bold text-cre-navy">{st?.admissionNumber || '—'}</td>
+                          )}
+                          {showName && (
+                            <td className="py-3 px-4 font-bold text-slate-900">{st?.name || 'Student'}</td>
+                          )}
+                          {showPlace && (
+                            <td className="py-3 px-4 text-slate-600">{st?.place || '—'}</td>
+                          )}
+                          {showDetails && (
+                            <>
+                              <td className="py-3 px-4 text-slate-700">{formatCurrency(f.expectedFee)}</td>
+                              <td className="py-3 px-4 text-cre-green font-bold">{formatCurrency(f.paidAmount)}</td>
+                              <td className="py-3 px-4 text-red-600 font-semibold">{formatCurrency(f.outstandingAmount)}</td>
+                            </>
+                          )}
+                          {showStatus && (
+                            <td className="py-3 px-4 text-right">
+                              <span
+                                className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                  f.status === 'Paid'
+                                    ? 'bg-cre-green-light text-cre-green'
+                                    : f.status === 'Partially Paid'
+                                    ? 'bg-amber-50 text-amber-700'
+                                    : 'bg-red-50 text-red-700'
+                                }`}
+                              >
+                                {f.status}
+                              </span>
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 4. FINANCIAL STATEMENT VIEW */}
+        {reportType === 'financial' && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="bg-cre-green-light p-5 rounded-2xl border border-cre-green/30 shadow-xs">
+                <span className="text-xs font-bold uppercase tracking-wider text-cre-green block">Total Statewide Income</span>
+                <span className="text-2xl font-black text-cre-green mt-1 block">
+                  {formatCurrency(financialSummary.totalIncome)}
+                </span>
+                <p className="text-[11px] text-slate-500 mt-1">Student fees and general donations</p>
+              </div>
+
+              <div className="bg-red-50 p-5 rounded-2xl border border-red-200 shadow-xs">
+                <span className="text-xs font-bold uppercase tracking-wider text-red-600 block">Total Expenditure</span>
+                <span className="text-2xl font-black text-red-700 mt-1 block">
+                  {formatCurrency(financialSummary.totalExpenses)}
+                </span>
+                <p className="text-[11px] text-slate-500 mt-1">Operating costs and weekly sessions</p>
+              </div>
+
+              <div className="bg-white p-5 rounded-2xl border border-cre-border shadow-xs">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500 block">Net System Surplus</span>
+                <span className="text-2xl font-black text-cre-navy mt-1 block">
+                  {formatCurrency(financialSummary.netBalance)}
+                </span>
+                <p className="text-[11px] text-slate-500 mt-1">Consolidated reserve balance</p>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-cre-border shadow-xs overflow-hidden">
+              <div className="p-4 border-b border-cre-border">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-cre-navy">
+                  Statewide Financial Statement ({selectedMonth})
+                </h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 border-b border-cre-border text-[11px] font-bold text-cre-navy uppercase">
+                    <tr>
+                      <th className="py-3 px-4">Accounting Head</th>
+                      <th className="py-3 px-4">Transaction Type</th>
+                      <th className="py-3 px-4 text-right">Amount (INR)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-cre-border font-medium">
+                    <tr className="hover:bg-slate-50/60">
+                      <td className="py-3 px-4 font-bold text-slate-900">Student Fee Collections</td>
+                      <td className="py-3 px-4 text-cre-green font-semibold">Income</td>
+                      <td className="py-3 px-4 text-right font-bold text-cre-green">{formatCurrency(financialSummary.totalFeeIncome)}</td>
+                    </tr>
+                    <tr className="hover:bg-slate-50/60">
+                      <td className="py-3 px-4 font-bold text-slate-900">Direct Donations Received</td>
+                      <td className="py-3 px-4 text-cre-green font-semibold">Income</td>
+                      <td className="py-3 px-4 text-right font-bold text-cre-green">{formatCurrency(financialSummary.totalDonationIncome)}</td>
+                    </tr>
+                    <tr className="bg-cre-green-light/30">
+                      <td className="py-3 px-4 font-black text-cre-navy uppercase">TOTAL CONSOLIDATED INCOME</td>
+                      <td className="py-3 px-4 text-cre-green font-bold">Total Inflow</td>
+                      <td className="py-3 px-4 text-right font-black text-cre-green">{formatCurrency(financialSummary.totalIncome)}</td>
+                    </tr>
+                    <tr className="hover:bg-slate-50/60">
+                      <td className="py-3 px-4 font-bold text-slate-900">Weekly Class Sessions Operational Expenses</td>
+                      <td className="py-3 px-4 text-red-600 font-semibold">Expenditure</td>
+                      <td className="py-3 px-4 text-right font-bold text-red-600">{formatCurrency(financialSummary.totalWeeklyExpense)}</td>
+                    </tr>
+                    <tr className="hover:bg-slate-50/60">
+                      <td className="py-3 px-4 font-bold text-slate-900">Other General & Maintenance Expenses</td>
+                      <td className="py-3 px-4 text-red-600 font-semibold">Expenditure</td>
+                      <td className="py-3 px-4 text-right font-bold text-red-600">{formatCurrency(financialSummary.totalOtherExpense)}</td>
+                    </tr>
+                    <tr className="bg-red-50/30">
+                      <td className="py-3 px-4 font-black text-cre-navy uppercase">TOTAL CONSOLIDATED EXPENDITURE</td>
+                      <td className="py-3 px-4 text-red-600 font-bold">Total Outflow</td>
+                      <td className="py-3 px-4 text-right font-black text-red-600">{formatCurrency(financialSummary.totalExpenses)}</td>
+                    </tr>
+                    <tr className="bg-slate-100 font-black">
+                      <td className="py-3.5 px-4 text-cre-navy uppercase">NET SURPLUS / BALANCE</td>
+                      <td className="py-3.5 px-4 text-slate-600">Net</td>
+                      <td className="py-3.5 px-4 text-right text-base text-cre-navy">{formatCurrency(financialSummary.netBalance)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 5. EXAM REPORT VIEW */}
+        {reportType === 'exam' && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              <div className="bg-white p-4 rounded-2xl border border-cre-border shadow-xs">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Exams Conducted</span>
+                <span className="text-xl font-black text-cre-navy mt-1 block">{allExams.length}</span>
+              </div>
+              <div className="bg-cre-green-light p-4 rounded-2xl border border-cre-green/30 shadow-xs">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-cre-green block">Recorded Marks</span>
+                <span className="text-xl font-black text-cre-green mt-1 block">{allExamMarks.length}</span>
+              </div>
+              <div className="bg-white p-4 rounded-2xl border border-cre-border shadow-xs col-span-2 sm:col-span-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Total Students</span>
+                <span className="text-xl font-black text-cre-navy mt-1 block">{students.length}</span>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-cre-border shadow-xs overflow-hidden">
+              <div className="p-4 border-b border-cre-border">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-cre-navy">
+                  Examination Marks Roster ({centerDisplayName})
+                </h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 border-b border-cre-border text-[11px] font-bold text-cre-navy uppercase">
+                    <tr>
+                      <th className="py-3 px-4">#</th>
+                      {showAdmNo && <th className="py-3 px-4">Adm No</th>}
+                      {showName && <th className="py-3 px-4">Student Name</th>}
+                      {showPlace && <th className="py-3 px-4">Place</th>}
+                      {showDetails && (
+                        <>
+                          <th className="py-3 px-4">Exam Title</th>
+                          <th className="py-3 px-4">Score</th>
+                          <th className="py-3 px-4">Max Marks</th>
+                        </>
+                      )}
+                      {showStatus && <th className="py-3 px-4 text-right">Result</th>}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-cre-border">
+                    {allExamMarks.map((m, idx) => {
+                      const st = dataService.getStudentById(m.studentId);
+                      const ex = dataService.getExamById(m.examId);
+                      return (
+                        <tr key={m.id} className="hover:bg-slate-50/60 transition-colors">
+                          <td className="py-3 px-4 text-slate-400 font-bold">{idx + 1}</td>
+                          {showAdmNo && (
+                            <td className="py-3 px-4 font-mono font-bold text-cre-navy">{st?.admissionNumber || '—'}</td>
+                          )}
+                          {showName && (
+                            <td className="py-3 px-4 font-bold text-slate-900">{st?.name || 'Student'}</td>
+                          )}
+                          {showPlace && (
+                            <td className="py-3 px-4 text-slate-600">{st?.place || '—'}</td>
+                          )}
+                          {showDetails && (
+                            <>
+                              <td className="py-3 px-4 font-semibold text-slate-800">{ex?.name || 'Examination'}</td>
+                              <td className="py-3 px-4 font-bold text-cre-green">{m.marksObtained}</td>
+                              <td className="py-3 px-4 text-slate-500">{m.maxMarks}</td>
+                            </>
+                          )}
+                          {showStatus && (
+                            <td className="py-3 px-4 text-right">
+                              <span
+                                className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                  m.isPassed
+                                    ? 'bg-cre-green-light text-cre-green'
+                                    : 'bg-red-50 text-red-700'
+                                }`}
+                              >
+                                {m.isPassed ? 'PASSED' : 'NEEDS IMPROVEMENT'}
+                              </span>
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })}
+                    {allExamMarks.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="py-8 text-center text-slate-400">
+                          No examination marks entered yet for this selection.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         )}
 

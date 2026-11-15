@@ -16,6 +16,8 @@ import {
   Phone,
   Trash2,
   Lock,
+  Edit2,
+  MapPin,
 } from 'lucide-react';
 
 export default function CenterAdminLoginsPage() {
@@ -23,8 +25,10 @@ export default function CenterAdminLoginsPage() {
   const centerId = activeCenter?.id || '';
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingAdmin, setEditingAdmin] = useState<AdminUser | null>(null);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [place, setPlace] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -38,8 +42,19 @@ export default function CenterAdminLoginsPage() {
       setError('Each centre can have a maximum of THREE administrator login numbers.');
       return;
     }
+    setEditingAdmin(null);
     setName('');
     setPhone('');
+    setPlace('');
+    setError(null);
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEdit = (user: AdminUser) => {
+    setEditingAdmin(user);
+    setName(user.name);
+    setPhone(user.phone);
+    setPlace(user.place || '');
     setError(null);
     setIsModalOpen(true);
   };
@@ -54,31 +69,46 @@ export default function CenterAdminLoginsPage() {
       return;
     }
 
-    if (activeAdminsCount >= 3) {
+    if (!editingAdmin && activeAdminsCount >= 3) {
       setError('Maximum 3 active administrator logins allowed for this centre.');
       return;
     }
 
     const defaultPwd = getDefaultPassword(cleanPhone);
 
-    const newAdmin: AdminUser = {
-      uid: 'admin-' + Date.now().toString(36),
-      phone: cleanPhone,
-      name,
-      role: 'CENTER_ADMIN',
-      centerIds: [centerId],
-      mustChangePassword: true, // First login password change compulsory
-      isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    if (editingAdmin) {
+      const updated: AdminUser = {
+        ...editingAdmin,
+        name,
+        phone: cleanPhone,
+        place: place.trim() || undefined,
+        updatedAt: new Date().toISOString(),
+      };
+      dataService.saveUser(updated);
+      setIsModalOpen(false);
+      setSuccess(`Administrator "${name}" updated successfully.`);
+    } else {
+      const newAdmin: AdminUser = {
+        uid: 'admin-' + Date.now().toString(36),
+        phone: cleanPhone,
+        name,
+        place: place.trim() || undefined,
+        role: 'CENTER_ADMIN',
+        centerIds: [centerId],
+        mustChangePassword: true, // First login password change compulsory
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
 
-    dataService.saveUser(newAdmin);
-    setIsModalOpen(false);
-    setSuccess(
-      `Administrator added successfully. Default password: ${defaultPwd} (Compulsory change required on first login)`
-    );
-    setTimeout(() => setSuccess(null), 6000);
+      dataService.saveUser(newAdmin);
+      setIsModalOpen(false);
+      setSuccess(
+        `Administrator added successfully. Default password: ${defaultPwd} (Compulsory change required on first login)`
+      );
+    }
+
+    setTimeout(() => setSuccess(null), 5000);
     refreshData();
   };
 
@@ -189,14 +219,24 @@ export default function CenterAdminLoginsPage() {
                       </button>
                     </td>
                     <td className="py-3.5 px-4 text-right">
-                      <button
-                        type="button"
-                        onClick={() => handleRemove(u)}
-                        className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Remove Administrator from Centre"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="inline-flex items-center space-x-1">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEdit(u)}
+                          className="p-1.5 text-slate-500 hover:text-cre-navy hover:bg-slate-100 rounded-lg transition-colors"
+                          title="Edit Administrator"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemove(u)}
+                          className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Remove Administrator from Centre"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -213,12 +253,14 @@ export default function CenterAdminLoginsPage() {
           </div>
         </div>
 
-        {/* ADD ADMIN MODAL */}
+        {/* ADD / EDIT ADMIN MODAL */}
         {isModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
             <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-cre-border">
               <div className="flex items-center justify-between pb-3 border-b border-cre-border">
-                <h3 className="text-sm font-bold text-cre-navy">Add Centre Administrator</h3>
+                <h3 className="text-sm font-bold text-cre-navy">
+                  {editingAdmin ? 'Edit Centre Administrator' : 'Add Centre Administrator'}
+                </h3>
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
@@ -241,6 +283,24 @@ export default function CenterAdminLoginsPage() {
                     placeholder="e.g. Shameem K."
                     className="w-full px-3.5 py-2 text-xs border border-cre-border rounded-xl focus:ring-2 focus:ring-cre-green focus:outline-hidden"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Place / Town
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                      <MapPin className="w-3.5 h-3.5" />
+                    </div>
+                    <input
+                      type="text"
+                      value={place}
+                      onChange={(e) => setPlace(e.target.value)}
+                      placeholder="e.g. Manjeri, Malappuram"
+                      className="w-full pl-9 pr-3.5 py-2 text-xs border border-cre-border rounded-xl focus:ring-2 focus:ring-cre-green focus:outline-hidden"
+                    />
+                  </div>
                 </div>
 
                 <div>
@@ -277,7 +337,7 @@ export default function CenterAdminLoginsPage() {
                     type="submit"
                     className="px-5 py-2 text-xs font-bold text-white bg-cre-green hover:bg-cre-green-hover rounded-xl shadow-xs"
                   >
-                    Create Administrator
+                    {editingAdmin ? 'Update Administrator' : 'Create Administrator'}
                   </button>
                 </div>
               </form>

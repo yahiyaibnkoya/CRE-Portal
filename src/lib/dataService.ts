@@ -467,6 +467,45 @@ class DataService {
     return user;
   }
 
+  public deleteUser(uid: string, performedBy?: string): boolean {
+    this.init();
+    const users = this.getUsers();
+    const user = users.find(u => u.uid === uid);
+    if (!user) return false;
+
+    // Disallow deleting the primary super administrator
+    if (user.role === 'SUPER_ADMIN') {
+      const superAdmins = users.filter(u => u.role === 'SUPER_ADMIN');
+      if (superAdmins.length <= 1) {
+        throw new Error('Cannot delete the primary Super Administrator account.');
+      }
+    }
+
+    const remainingUsers = users.filter(u => u.uid !== uid);
+    setLocal('users', remainingUsers);
+
+    // Also remove admin phone from any centers' adminPhones list
+    const centers = this.getCenters();
+    let centersChanged = false;
+    centers.forEach(c => {
+      if (c.adminPhones && c.adminPhones.includes(user.phone)) {
+        c.adminPhones = c.adminPhones.filter(p => p !== user.phone);
+        centersChanged = true;
+      }
+    });
+    if (centersChanged) {
+      setLocal('centers', centers);
+    }
+
+    // Clean up stored password if any
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(getKey(`pwd_${normalizePhoneNumber(user.phone)}`));
+    }
+
+    this.logAudit('Administrator Deleted', `Administrator ${user.name} (${user.phone}) deleted by ${performedBy || 'Super Admin'}`, performedBy || 'Super Admin');
+    return true;
+  }
+
   public registerCenterWithAdmin(params: {
     centerData: Partial<Center> & { name: string; place: string };
     adminPhone: string;

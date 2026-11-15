@@ -17,8 +17,10 @@ import {
   AlertCircle,
   RefreshCw,
   Edit2,
+  Trash2,
   X,
   Phone,
+  MapPin,
 } from 'lucide-react';
 
 export default function SuperAdminAdminsPage() {
@@ -30,10 +32,13 @@ export default function SuperAdminAdminsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAdmin, setEditingAdmin] = useState<AdminUser | null>(null);
   const [resettingUser, setResettingUser] = useState<AdminUser | null>(null);
+  const [deletingAdmin, setDeletingAdmin] = useState<AdminUser | null>(null);
 
   // Form State
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [place, setPlace] = useState('');
+  const [isActiveAdmin, setIsActiveAdmin] = useState(true);
   const [selectedCenterIds, setSelectedCenterIds] = useState<string[]>([]);
   const [role, setRole] = useState<'CENTER_ADMIN' | 'SUPER_ADMIN'>('CENTER_ADMIN');
   const [error, setError] = useState<string | null>(null);
@@ -59,6 +64,8 @@ export default function SuperAdminAdminsPage() {
     setEditingAdmin(null);
     setName('');
     setPhone('');
+    setPlace('');
+    setIsActiveAdmin(true);
     setSelectedCenterIds(centers.length > 0 ? [centers[0].id] : []);
     setRole('CENTER_ADMIN');
     setError(null);
@@ -69,6 +76,8 @@ export default function SuperAdminAdminsPage() {
     setEditingAdmin(user);
     setName(user.name);
     setPhone(user.phone);
+    setPlace(user.place || '');
+    setIsActiveAdmin(user.isActive);
     setSelectedCenterIds(user.centerIds);
     setRole(user.role);
     setError(null);
@@ -105,10 +114,11 @@ export default function SuperAdminAdminsPage() {
       uid: editingAdmin ? editingAdmin.uid : 'admin-' + Date.now().toString(36),
       phone: cleanPhone,
       name,
+      place: place.trim() || undefined,
       role,
       centerIds: selectedCenterIds,
       mustChangePassword: editingAdmin ? editingAdmin.mustChangePassword : true,
-      isActive: editingAdmin ? editingAdmin.isActive : true,
+      isActive: isActiveAdmin,
       createdAt: editingAdmin ? editingAdmin.createdAt : new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -116,9 +126,11 @@ export default function SuperAdminAdminsPage() {
     dataService.saveUser(updatedUser);
     setIsModalOpen(false);
     setSuccessMsg(
-      `Administrator saved. Initial password: ${defaultPwd} (Compulsory change required on first login)`
+      editingAdmin
+        ? `Administrator "${name}" updated successfully.`
+        : `Administrator created. Initial password: ${defaultPwd} (Compulsory change required on first login)`
     );
-    setTimeout(() => setSuccessMsg(null), 6000);
+    setTimeout(() => setSuccessMsg(null), 5000);
     refreshData();
   };
 
@@ -139,6 +151,27 @@ export default function SuperAdminAdminsPage() {
     setResettingUser(null);
     setTimeout(() => setSuccessMsg(null), 6000);
     refreshData();
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deletingAdmin) return;
+    if (deletingAdmin.phone === currentSuperAdmin?.phone) {
+      setError('You cannot delete your own currently logged-in account.');
+      setDeletingAdmin(null);
+      return;
+    }
+
+    try {
+      dataService.deleteUser(deletingAdmin.uid, currentSuperAdmin?.name || 'Super Admin');
+      setSuccessMsg(`Administrator "${deletingAdmin.name}" (${deletingAdmin.phone}) deleted successfully.`);
+      setDeletingAdmin(null);
+      setTimeout(() => setSuccessMsg(null), 5000);
+      refreshData();
+    } catch (err: any) {
+      setError(err?.message || 'Failed to delete administrator account.');
+      setDeletingAdmin(null);
+      setTimeout(() => setError(null), 5000);
+    }
   };
 
   return (
@@ -304,6 +337,14 @@ export default function SuperAdminAdminsPage() {
                           >
                             <Edit2 className="w-4 h-4" />
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeletingAdmin(u)}
+                            className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Delete Administrator"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -360,6 +401,24 @@ export default function SuperAdminAdminsPage() {
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Place / Town
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                      <MapPin className="w-3.5 h-3.5" />
+                    </div>
+                    <input
+                      type="text"
+                      value={place}
+                      onChange={(e) => setPlace(e.target.value)}
+                      placeholder="e.g. Manjeri, Malappuram"
+                      className="w-full pl-9 pr-3.5 py-2 text-xs border border-cre-border rounded-xl focus:ring-2 focus:ring-cre-green focus:outline-hidden"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
                     Registered Mobile Number (Username) *
                   </label>
                   <div className="relative">
@@ -393,6 +452,22 @@ export default function SuperAdminAdminsPage() {
                     <option value="SUPER_ADMIN">Super Administrator (Global)</option>
                   </select>
                 </div>
+
+                {editingAdmin && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Account Status
+                    </label>
+                    <select
+                      value={isActiveAdmin ? 'active' : 'suspended'}
+                      onChange={(e) => setIsActiveAdmin(e.target.value === 'active')}
+                      className="w-full px-3.5 py-2 text-xs border border-cre-border rounded-xl font-semibold"
+                    >
+                      <option value="active">Active (Access Allowed)</option>
+                      <option value="suspended">Suspended (Access Blocked)</option>
+                    </select>
+                  </div>
+                )}
 
                 {role === 'CENTER_ADMIN' && (
                   <div>
@@ -433,7 +508,7 @@ export default function SuperAdminAdminsPage() {
                     type="submit"
                     className="px-5 py-2 text-xs font-bold text-white bg-cre-green hover:bg-cre-green-hover rounded-xl shadow-xs"
                   >
-                    Save Administrator
+                    {editingAdmin ? 'Update Administrator' : 'Save Administrator'}
                   </button>
                 </div>
               </form>
@@ -472,6 +547,43 @@ export default function SuperAdminAdminsPage() {
                   className="px-4 py-2 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-xl shadow-xs"
                 >
                   Reset Password
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* DELETE ADMINISTRATOR CONFIRMATION MODAL */}
+        {deletingAdmin && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
+            <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-cre-border text-center">
+              <div className="w-12 h-12 rounded-full bg-red-50 text-red-600 flex items-center justify-center mx-auto mb-3">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <h3 className="text-sm font-bold text-cre-navy">
+                Delete Administrator?
+              </h3>
+              <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+                Are you sure you want to permanently delete administrator account <span className="font-bold text-cre-navy">{deletingAdmin.name}</span> (<span className="font-mono font-semibold">{deletingAdmin.phone}</span>)?
+              </p>
+              <div className="p-3 bg-red-50 border border-red-200 rounded-xl my-4 text-[11px] text-red-700 text-left">
+                This will revoke their login access and dissociate their mobile number from any assigned CRE centres.
+              </div>
+
+              <div className="flex items-center justify-center space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setDeletingAdmin(null)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDelete}
+                  className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-xs"
+                >
+                  Yes, Delete
                 </button>
               </div>
             </div>
