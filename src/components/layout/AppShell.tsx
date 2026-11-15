@@ -18,7 +18,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
           isOpenMobile={isMobileMenuOpen}
           onCloseMobile={() => setIsMobileMenuOpen(false)}
         />
-        <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 overflow-y-auto">
+        <main className="flex-1 min-w-0 p-3 sm:p-5 lg:p-7 overflow-y-auto">
           {children}
         </main>
       </div>

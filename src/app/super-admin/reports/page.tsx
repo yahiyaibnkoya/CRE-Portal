@@ -31,7 +31,7 @@ function SuperAdminReportsContent() {
   const searchParams = useSearchParams();
   const initialTab = (searchParams.get('tab') as any) || 'class_attendance';
   const initialDate = searchParams.get('date') || '';
-  const initialCenter = searchParams.get('center') || 'center-manjeri-01';
+  const initialCenter = searchParams.get('center') || 'ALL';
 
   const [selectedCenter, setSelectedCenter] = useState<string>(initialCenter);
   const [reportType, setReportType] = useState<'class_attendance' | 'fee' | 'attendance' | 'financial' | 'exam'>(initialTab);

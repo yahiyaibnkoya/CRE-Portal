@@ -83,9 +83,9 @@ NEXT_PUBLIC_FIREBASE_APP_ID=1:1234567890:web:...
 
 ### Role 2: Centre Admin
 - **Max Admins per Centre:** Exactly 3 administrator accounts allowed per centre.
-- **Username / Mobile Number:** Registered individual mobile number (e.g., `9999999999` or `9876543210`).
-- **Initial Password:** First 8 digits of mobile number.
-- **First Login Requirement:** Compulsory redirect to `/change-password`.
+- **Username / Mobile Number:** Registered individual mobile number.
+- **Initial Password:** First 8 digits of mobile number (or custom set password during registration).
+- **First Login Requirement:** Compulsory redirect to `/change-password` if default password is used.
 
 ### Role 3: Student / Parent
 - **No Password Required!**
@@ -135,12 +135,12 @@ git push -u origin main
 
 ## 6. Verification & Quality Checklist
 
-1. **Administrator Login:** Sign in with `9999999999` and `99999999`. Verify dashboard routing.
-2. **Centre Creation:** Register a centre under **CRE Centres**. Test approval mode (Automatic vs Manual).
+1. **Administrator Login:** Sign in with authorized admin mobile number and password. Verify dashboard routing.
+2. **Centre Creation:** Register a centre under **CRE Centres** or click "Add Centre". Set initial admin mobile number.
 3. **Admin Limit:** Add up to 3 administrators per centre and verify the quota block on the 4th attempt.
 4. **Attendance Marking:** Mark Present, Absent, and Leave. Verify that percentage = `(Present / Conducted) * 100`.
 5. **Fee Payment:** Record full, partial, and excess fee payments. Check that student monthly status and financial income register update automatically.
 6. **WhatsApp Reports:** Click "Share on WhatsApp" to verify pre-formatted bold text messages.
 7. **Branded PDF:** Click "Download PDF" to check that PDFs generate in the browser with CRE and Wisdom logos.
-8. **Student Portal:** Log in with parent phone `9847000111` to verify multi-child selection and read-only statements.
+8. **Student Portal:** Log in with parent phone number to verify student attendance and statements.
 9. **Donate a Contact:** Submit an admission referral and verify duplicate phone detection.

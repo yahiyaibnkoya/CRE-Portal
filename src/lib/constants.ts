@@ -16,7 +16,6 @@ export const BRAND_COLORS = {
 export const SUPER_ADMIN_DEFAULT_PHONE = '9644889944';
 export const SUPER_ADMIN_DEFAULT_PASSWORD = '96448899';
 export const SUPER_ADMIN_WHATSAPP_RESET = '9644889944';
-export const DEMO_ADMIN_PHONE = '9999999999';
 
 export const KERALA_DISTRICTS: string[] = [
   'Thiruvananthapuram',

@@ -94,38 +94,38 @@ export default function HomePage() {
     <div className="min-h-screen bg-cre-bg flex flex-col font-sans">
       {/* Top Header */}
       <header className="bg-white border-b border-cre-border sticky top-0 z-30 shadow-xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-          <div className="flex items-center space-x-3 sm:space-x-5">
-            <div className="relative h-12 w-32 sm:w-36 flex items-center">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-15 sm:h-18 flex items-center justify-between">
+          <div className="flex items-center space-x-2 sm:space-x-4">
+            <div className="relative h-8 w-22 sm:h-11 sm:w-34 flex items-center">
               <Image
                 src="/cre-logo.png"
                 alt="CRE Logo"
-                width={150}
-                height={55}
-                className="object-contain"
+                width={140}
+                height={50}
+                className="object-contain max-h-8 sm:max-h-11"
                 priority
               />
             </div>
-            <div className="hidden sm:block h-8 w-px bg-slate-200"></div>
-            <div className="hidden sm:flex relative h-10 w-40 items-center">
+            <div className="hidden sm:block h-7 w-px bg-slate-200"></div>
+            <div className="hidden sm:flex relative h-9 w-36 items-center">
               <Image
                 src="/wisdom-students-logo.png"
                 alt="Wisdom Islamic Students Organization"
                 width={160}
                 height={45}
-                className="object-contain"
+                className="object-contain max-h-9"
                 priority
               />
             </div>
           </div>
 
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2 sm:space-x-3">
             <button
               type="button"
               onClick={() => setIsAddCenterModalOpen(true)}
-              className="inline-flex items-center px-4 py-2 sm:px-4 sm:py-2.5 rounded-xl text-xs font-bold text-cre-navy bg-cre-navy-light hover:bg-cre-navy hover:text-white transition-all shadow-xs"
+              className="inline-flex items-center px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold text-cre-navy bg-cre-navy-light hover:bg-cre-navy hover:text-white transition-all shadow-xs"
             >
-              <Plus className="w-4 h-4 mr-1.5 text-cre-green" />
+              <Plus className="w-3.5 h-3.5 mr-1 text-cre-green" />
               <span>Add CRE Centre</span>
             </button>
           </div>
@@ -133,18 +133,18 @@ export default function HomePage() {
       </header>
 
       {/* Main Container: Basic Information, Login Redirects & Add Centre Option */}
-      <main className="flex-1 flex flex-col justify-center py-10 sm:py-14 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto w-full text-center">
-        <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-cre-green-light border border-cre-green/30 text-cre-green text-xs font-bold mb-4 mx-auto">
+      <main className="flex-1 flex flex-col justify-center py-7 sm:py-12 px-3 sm:px-6 lg:px-8 max-w-4xl mx-auto w-full text-center">
+        <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-cre-green-light border border-cre-green/30 text-cre-green text-[11px] sm:text-xs font-bold mb-3 sm:mb-4 mx-auto">
           <span className="w-2 h-2 rounded-full bg-cre-green"></span>
           <span>Wisdom Islamic Students Organisation</span>
         </div>
 
-        <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-cre-navy tracking-tight max-w-3xl mx-auto leading-tight">
+        <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black text-cre-navy tracking-tight max-w-3xl mx-auto leading-tight">
           Continuing Religious Education <span className="text-cre-green">(CRE)</span>
         </h1>
 
         {/* Basic Information & Core Purpose */}
-        <div className="mt-6 bg-white p-6 sm:p-7 rounded-2xl border border-cre-border shadow-xs text-left space-y-4">
+        <div className="mt-5 sm:mt-6 bg-white p-4 sm:p-7 rounded-2xl border border-cre-border shadow-xs text-left space-y-3 sm:space-y-4">
           <p className="text-xs sm:text-sm text-slate-700 leading-relaxed font-medium">
             <span className="font-bold text-cre-navy">CRE</span> stands for <span className="font-bold text-cre-navy">Continuing Religious Education</span>, a structured religious education initiative conducted by the <span className="font-bold text-cre-green">Wisdom Islamic Students Organisation</span> in Kerala.
           </p>

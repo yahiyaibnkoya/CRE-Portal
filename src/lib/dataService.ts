@@ -78,7 +78,7 @@ export const DEFAULT_SETTINGS: SystemSettings = {
   districts: [...KERALA_DISTRICTS],
 };
 
-// Initial Seed Data to ensure instant functionality out-of-the-box
+// Initial Seed Data: ONLY the primary Super Admin, NO demo data!
 function getInitialSeedData() {
   const superAdmin: AdminUser = {
     uid: 'super-admin-01',
@@ -86,239 +86,154 @@ function getInitialSeedData() {
     name: 'Wisdom Super Admin',
     role: 'SUPER_ADMIN',
     centerIds: [],
-    mustChangePassword: true, // As required: must change initial default password on first login
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-
-  const sampleCenter: Center = {
-    id: 'center-manjeri-01',
-    name: 'Manjeri CRE Centre',
-    place: 'Manjeri Town',
-    state: 'Kerala',
-    district: 'Malappuram West',
-    zoneOrUnit: 'Zone',
-    zoneName: 'Manjeri Zone',
-    regularDay: 'Sunday',
-    startTime: '09:00',
-    endTime: '11:30',
-    effectiveDate: '2026-01-01',
-    facultyName: 'Usthad Abdul Rasheed Salafi',
-    contactNumbers: ['9847012345', '9447123456'],
-    status: 'Active',
-    defaultFee: 150,
-    examMode: 'semester',
-    adminPhones: ['9876543210', '9999999999'],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-
-  const sampleCenterAdmin: AdminUser = {
-    uid: 'admin-manjeri-01',
-    phone: '9876543210',
-    name: 'Farooq K.',
-    place: 'Manjeri',
-    role: 'CENTER_ADMIN',
-    centerIds: ['center-manjeri-01'],
     mustChangePassword: true,
     isActive: true,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
 
-  const demoCenterAdmin: AdminUser = {
-    uid: 'admin-demo-99',
-    phone: '9999999999',
-    name: 'Wisdom Demo Admin',
-    place: 'Kozhikode',
-    role: 'CENTER_ADMIN',
-    centerIds: ['center-manjeri-01'],
-    mustChangePassword: false,
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-
-  const sampleStudents: Student[] = [
-    {
-      id: 'std-001',
-      centerId: 'center-manjeri-01',
-      admissionNumber: 'CRE-MNJ-001',
-      name: 'Muhammed Rayan',
-      parentName: 'Rayees K.',
-      studentPhone: '9847111222',
-      parentPhone: '9847000111',
-      place: 'Kizhakkethala',
-      admissionDate: '2026-01-10',
-      defaultFee: 150,
-      status: 'Active',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: 'std-002',
-      centerId: 'center-manjeri-01',
-      admissionNumber: 'CRE-MNJ-002',
-      name: 'Fathima Zoya',
-      parentName: 'Rayees K.', // Same parent phone to test multi-child selection!
-      studentPhone: '',
-      parentPhone: '9847000111',
-      place: 'Kizhakkethala',
-      admissionDate: '2026-01-15',
-      defaultFee: 150,
-      status: 'Active',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: 'std-003',
-      centerId: 'center-manjeri-01',
-      admissionNumber: 'CRE-MNJ-003',
-      name: 'Ameen Bilal',
-      parentName: 'Bilal M.',
-      studentPhone: '9847222333',
-      parentPhone: '9847333444',
-      place: 'Pandikkad Road',
-      admissionDate: '2026-02-01',
-      defaultFee: 150,
-      status: 'Active',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: 'std-004',
-      centerId: 'center-manjeri-01',
-      admissionNumber: 'CRE-MNJ-004',
-      name: 'Aisha Haneen',
-      parentName: 'Usman V.',
-      studentPhone: '',
-      parentPhone: '9847555666',
-      place: 'Melakam',
-      admissionDate: '2026-02-15',
-      defaultFee: 150,
-      status: 'Active',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: 'std-005',
-      centerId: 'center-manjeri-01',
-      admissionNumber: 'CRE-MNJ-005',
-      name: 'Salman Faris',
-      parentName: 'Musthafa P.',
-      studentPhone: '9847777888',
-      parentPhone: '9847888999',
-      place: 'Kacherippadi',
-      admissionDate: '2026-03-01',
-      defaultFee: 150,
-      status: 'Active',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-  ];
-
-  // Attendance for last 4 weeks (Sundays: Nov 1, Nov 8, Nov 15, Nov 22)
-  const sampleAttendance: AttendanceRecord[] = [
-    // Nov 1
-    { id: 'att-1-1', centerId: 'center-manjeri-01', date: '2026-11-01', studentId: 'std-001', status: 'Present', recordedBy: 'Farooq K.', recordedAt: '2026-11-01T11:45:00' },
-    { id: 'att-1-2', centerId: 'center-manjeri-01', date: '2026-11-01', studentId: 'std-002', status: 'Present', recordedBy: 'Farooq K.', recordedAt: '2026-11-01T11:45:00' },
-    { id: 'att-1-3', centerId: 'center-manjeri-01', date: '2026-11-01', studentId: 'std-003', status: 'Present', recordedBy: 'Farooq K.', recordedAt: '2026-11-01T11:45:00' },
-    { id: 'att-1-4', centerId: 'center-manjeri-01', date: '2026-11-01', studentId: 'std-004', status: 'Absent', recordedBy: 'Farooq K.', recordedAt: '2026-11-01T11:45:00' },
-    { id: 'att-1-5', centerId: 'center-manjeri-01', date: '2026-11-01', studentId: 'std-005', status: 'Present', recordedBy: 'Farooq K.', recordedAt: '2026-11-01T11:45:00' },
-    // Nov 8
-    { id: 'att-2-1', centerId: 'center-manjeri-01', date: '2026-11-08', studentId: 'std-001', status: 'Present', recordedBy: 'Farooq K.', recordedAt: '2026-11-08T11:40:00' },
-    { id: 'att-2-2', centerId: 'center-manjeri-01', date: '2026-11-08', studentId: 'std-002', status: 'Present', recordedBy: 'Farooq K.', recordedAt: '2026-11-08T11:40:00' },
-    { id: 'att-2-3', centerId: 'center-manjeri-01', date: '2026-11-08', studentId: 'std-003', status: 'Leave', remarks: 'Family event', recordedBy: 'Farooq K.', recordedAt: '2026-11-08T11:40:00' },
-    { id: 'att-2-4', centerId: 'center-manjeri-01', date: '2026-11-08', studentId: 'std-004', status: 'Present', recordedBy: 'Farooq K.', recordedAt: '2026-11-08T11:40:00' },
-    { id: 'att-2-5', centerId: 'center-manjeri-01', date: '2026-11-08', studentId: 'std-005', status: 'Present', recordedBy: 'Farooq K.', recordedAt: '2026-11-08T11:40:00' },
-  ];
-
-  // Fee payments for Nov 2026
-  const sampleFeePayments: FeePayment[] = [
-    { id: 'pay-001', centerId: 'center-manjeri-01', studentId: 'std-001', month: '2026-11', amount: 150, paymentDate: '2026-11-01', remarks: 'Cash', recordedBy: 'Farooq K.', createdAt: '2026-11-01T11:30:00' },
-    { id: 'pay-002', centerId: 'center-manjeri-01', studentId: 'std-002', month: '2026-11', amount: 150, paymentDate: '2026-11-01', remarks: 'Cash', recordedBy: 'Farooq K.', createdAt: '2026-11-01T11:30:00' },
-    { id: 'pay-003', centerId: 'center-manjeri-01', studentId: 'std-003', month: '2026-11', amount: 100, paymentDate: '2026-11-08', remarks: 'Partial payment', recordedBy: 'Farooq K.', createdAt: '2026-11-08T11:35:00' },
-  ];
-
-  const sampleMonthlyFees: MonthlyFeeRecord[] = [
-    { id: 'fee-001', centerId: 'center-manjeri-01', studentId: 'std-001', month: '2026-11', expectedFee: 150, paidAmount: 150, outstandingAmount: 0, advanceCredit: 0, status: 'Paid', lastPaymentDate: '2026-11-01' },
-    { id: 'fee-002', centerId: 'center-manjeri-01', studentId: 'std-002', month: '2026-11', expectedFee: 150, paidAmount: 150, outstandingAmount: 0, advanceCredit: 0, status: 'Paid', lastPaymentDate: '2026-11-01' },
-    { id: 'fee-003', centerId: 'center-manjeri-01', studentId: 'std-003', month: '2026-11', expectedFee: 150, paidAmount: 100, outstandingAmount: 50, advanceCredit: 0, status: 'Partially Paid', lastPaymentDate: '2026-11-08' },
-    { id: 'fee-004', centerId: 'center-manjeri-01', studentId: 'std-004', month: '2026-11', expectedFee: 150, paidAmount: 0, outstandingAmount: 150, advanceCredit: 0, status: 'Unpaid' },
-    { id: 'fee-005', centerId: 'center-manjeri-01', studentId: 'std-005', month: '2026-11', expectedFee: 150, paidAmount: 200, outstandingAmount: 0, advanceCredit: 50, status: 'Advance / Excess', lastPaymentDate: '2026-11-08' },
-  ];
-
-  const sampleDonations: Donation[] = [
-    { id: 'don-001', centerId: 'center-manjeri-01', donorName: 'Well-wisher', amount: 1000, date: '2026-11-05', remarks: 'General support for books', recordedBy: 'Farooq K.', createdAt: '2026-11-05T10:00:00' },
-  ];
-
-  const sampleExpenses: Expense[] = [
-    { id: 'exp-001', centerId: 'center-manjeri-01', type: 'weekly', sessionDate: '2026-11-01', category: 'Faculty TA', amount: 300, date: '2026-11-01', description: 'Faculty traveling allowance', recordedBy: 'Farooq K.', createdAt: '2026-11-01T12:00:00' },
-    { id: 'exp-002', centerId: 'center-manjeri-01', type: 'weekly', sessionDate: '2026-11-01', category: 'Refreshment – Drink', amount: 120, date: '2026-11-01', description: 'Tea and drinking water', recordedBy: 'Farooq K.', createdAt: '2026-11-01T12:00:00' },
-    { id: 'exp-003', centerId: 'center-manjeri-01', type: 'weekly', sessionDate: '2026-11-08', category: 'Faculty TA', amount: 300, date: '2026-11-08', description: 'Faculty traveling allowance', recordedBy: 'Farooq K.', createdAt: '2026-11-08T12:00:00' },
-    { id: 'exp-004', centerId: 'center-manjeri-01', type: 'weekly', sessionDate: '2026-11-08', category: 'Refreshment – Snack', amount: 150, date: '2026-11-08', description: 'Biscuits for students', recordedBy: 'Farooq K.', createdAt: '2026-11-08T12:00:00' },
-    { id: 'exp-005', centerId: 'center-manjeri-01', type: 'other', category: 'Printing', title: 'Exam Question Papers', amount: 250, date: '2026-11-10', description: 'Photocopy and binding', recordedBy: 'Farooq K.', createdAt: '2026-11-10T16:00:00' },
-  ];
-
-  const sampleExam: Exam = {
-    id: 'exam-001',
-    centerId: 'center-manjeri-01',
-    name: 'Mid-Term Evaluation',
-    mode: 'semester',
-    semesterName: 'Semester 1',
-    date: '2026-10-25',
-    subjects: [
-      { id: 'sub-01', name: 'Quran Recitation & Tajweed', maxMarks: 50, passMarks: 20 },
-      { id: 'sub-02', name: 'Aqeedah & Fiqh', maxMarks: 50, passMarks: 20 },
-    ],
-    createdAt: '2026-10-20T10:00:00',
-  };
-
-  const sampleMarks: ExamMark[] = [
-    { id: 'mrk-1', centerId: 'center-manjeri-01', examId: 'exam-001', subjectId: 'sub-01', studentId: 'std-001', marksObtained: 46, maxMarks: 50, isPassed: true, enteredAt: '2026-10-26' },
-    { id: 'mrk-2', centerId: 'center-manjeri-01', examId: 'exam-001', subjectId: 'sub-02', studentId: 'std-001', marksObtained: 44, maxMarks: 50, isPassed: true, enteredAt: '2026-10-26' },
-    { id: 'mrk-3', centerId: 'center-manjeri-01', examId: 'exam-001', subjectId: 'sub-01', studentId: 'std-002', marksObtained: 48, maxMarks: 50, isPassed: true, enteredAt: '2026-10-26' },
-    { id: 'mrk-4', centerId: 'center-manjeri-01', examId: 'exam-001', subjectId: 'sub-02', studentId: 'std-002', marksObtained: 49, maxMarks: 50, isPassed: true, enteredAt: '2026-10-26' },
-  ];
-
-  const sampleDonatedContacts: DonatedContact[] = [
-    {
-      id: 'dc-001',
-      centerId: 'center-manjeri-01',
-      name: 'Nihad Paravakkal',
-      phone: '9847999000',
-      place: 'Manjeri',
-      remarks: 'Interested in Sunday morning batch',
-      status: 'New',
-      submittedByStudentId: 'std-001',
-      createdAt: '2026-11-12T14:30:00',
-      updatedAt: '2026-11-12T14:30:00',
-    },
-  ];
-
   return {
-    users: [superAdmin, sampleCenterAdmin, demoCenterAdmin],
-    centers: [sampleCenter],
-    students: sampleStudents,
-    attendance: sampleAttendance,
-    monthlyFees: sampleMonthlyFees,
-    feePayments: sampleFeePayments,
-    donations: sampleDonations,
-    expenses: sampleExpenses,
-    exams: [sampleExam],
-    examMarks: sampleMarks,
-    donatedContacts: sampleDonatedContacts,
+    users: [superAdmin],
+    centers: [] as Center[],
+    students: [] as Student[],
+    attendance: [] as AttendanceRecord[],
+    monthlyFees: [] as MonthlyFeeRecord[],
+    feePayments: [] as FeePayment[],
+    donations: [] as Donation[],
+    expenses: [] as Expense[],
+    exams: [] as Exam[],
+    examMarks: [] as ExamMark[],
+    donatedContacts: [] as DonatedContact[],
     settings: DEFAULT_SETTINGS,
-    auditLogs: [],
+    auditLogs: [] as AuditLog[],
   };
 }
 
 class DataService {
   private inited = false;
+  private firestoreSynced = false;
+
+  private async syncDocToFirestore(collName: string, id: string, data: any) {
+    try {
+      if (db && typeof window !== 'undefined') {
+        await setDoc(doc(db, collName, id), JSON.parse(JSON.stringify(data)), { merge: true });
+      }
+    } catch (err) {
+      console.warn(`Firestore sync error for ${collName}/${id}:`, err);
+    }
+  }
+
+  private async deleteDocFromFirestore(collName: string, id: string) {
+    try {
+      if (db && typeof window !== 'undefined') {
+        await deleteDoc(doc(db, collName, id));
+      }
+    } catch (err) {
+      console.warn(`Firestore delete error for ${collName}/${id}:`, err);
+    }
+  }
 
   public init() {
     if (this.inited || typeof window === 'undefined') return;
+
+    // 1. One-time clean purge of all demo data (Manjeri demo center, demo students, demo admins)
+    const purgeDone = localStorage.getItem(getKey('demo_purged_v2'));
+    if (!purgeDone) {
+      const demoCenterId = 'center-manjeri-01';
+      const demoPhones = ['9876543210', '9999999999'];
+
+      // Purge users
+      const currentUsers = getLocal<AdminUser[]>('users', []);
+      const cleanUsers = currentUsers.filter(
+        (u) => !demoPhones.includes(normalizePhoneNumber(u.phone)) && !u.name.toLowerCase().includes('demo')
+      );
+      if (!cleanUsers.some((u) => normalizePhoneNumber(u.phone) === SUPER_ADMIN_DEFAULT_PHONE)) {
+        cleanUsers.unshift({
+          uid: 'super-admin-01',
+          phone: SUPER_ADMIN_DEFAULT_PHONE,
+          name: 'Wisdom Super Admin',
+          role: 'SUPER_ADMIN',
+          centerIds: [],
+          mustChangePassword: true,
+          isActive: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      }
+      setLocal('users', cleanUsers);
+
+      // Purge centers: remove demo center
+      const currentCenters = getLocal<Center[]>('centers', []);
+      setLocal(
+        'centers',
+        currentCenters.filter((c) => c.id !== demoCenterId && c.name !== 'Manjeri CRE Centre')
+      );
+
+      // Purge students: remove any demo students
+      const currentStudents = getLocal<Student[]>('students', []);
+      setLocal(
+        'students',
+        currentStudents.filter((s) => s.centerId !== demoCenterId && !s.id.startsWith('std-00'))
+      );
+
+      // Purge attendance
+      const currentAtt = getLocal<AttendanceRecord[]>('attendance', []);
+      setLocal(
+        'attendance',
+        currentAtt.filter((a) => a.centerId !== demoCenterId && !a.id.startsWith('att-'))
+      );
+
+      // Purge fees
+      const currentFees = getLocal<MonthlyFeeRecord[]>('monthlyFees', []);
+      setLocal(
+        'monthlyFees',
+        currentFees.filter((f) => f.centerId !== demoCenterId && !f.id.startsWith('fee-00'))
+      );
+
+      const currentPay = getLocal<FeePayment[]>('feePayments', []);
+      setLocal(
+        'feePayments',
+        currentPay.filter((p) => p.centerId !== demoCenterId && !p.id.startsWith('pay-00'))
+      );
+
+      // Purge expenses
+      const currentExp = getLocal<Expense[]>('expenses', []);
+      setLocal(
+        'expenses',
+        currentExp.filter((e) => e.centerId !== demoCenterId && !e.id.startsWith('exp-00'))
+      );
+
+      // Purge donations
+      const currentDon = getLocal<Donation[]>('donations', []);
+      setLocal(
+        'donations',
+        currentDon.filter((d) => d.centerId !== demoCenterId && !d.id.startsWith('don-00'))
+      );
+
+      // Purge exams
+      const currentExams = getLocal<Exam[]>('exams', []);
+      setLocal(
+        'exams',
+        currentExams.filter((e) => e.centerId !== demoCenterId && e.id !== 'exam-001')
+      );
+
+      const currentMarks = getLocal<ExamMark[]>('examMarks', []);
+      setLocal(
+        'examMarks',
+        currentMarks.filter((m) => m.centerId !== demoCenterId && !m.id.startsWith('mrk-'))
+      );
+
+      // Purge contacts
+      const currentContacts = getLocal<DonatedContact[]>('donatedContacts', []);
+      setLocal(
+        'donatedContacts',
+        currentContacts.filter((c) => c.centerId !== demoCenterId && c.id !== 'dc-001')
+      );
+
+      localStorage.setItem(getKey('demo_purged_v2'), 'true');
+    }
+
+    // 2. Initial seed if storage is empty
     const existing = localStorage.getItem(getKey('users'));
     if (!existing) {
       const seed = getInitialSeedData();
@@ -336,7 +251,69 @@ class DataService {
       setLocal('settings', seed.settings);
       setLocal('auditLogs', seed.auditLogs);
     }
+
     this.inited = true;
+
+    // 3. Background Cloud Sync with Firebase Firestore so added data persists across re-deployments
+    if (!this.firestoreSynced && db && typeof window !== 'undefined') {
+      this.firestoreSynced = true;
+      this.syncWithFirestore();
+    }
+  }
+
+  private async syncWithFirestore() {
+    if (!db || typeof window === 'undefined') return;
+    try {
+      const collectionsToSync = [
+        'centers',
+        'users',
+        'students',
+        'attendance',
+        'monthlyFees',
+        'feePayments',
+        'expenses',
+        'donations',
+        'exams',
+        'examMarks',
+        'donatedContacts',
+      ];
+
+      for (const collName of collectionsToSync) {
+        try {
+          const snap = await getDocs(collection(db, collName));
+          if (!snap.empty) {
+            const firestoreItems: any[] = [];
+            snap.forEach((d) => firestoreItems.push(d.data()));
+            const localItems = getLocal<any[]>(collName, []);
+            const merged = [...localItems];
+            firestoreItems.forEach((fi) => {
+              const idField = fi.id ? 'id' : fi.uid ? 'uid' : null;
+              if (idField) {
+                const idx = merged.findIndex((m) => m[idField] === fi[idField]);
+                if (idx >= 0) merged[idx] = fi;
+                else merged.push(fi);
+              } else {
+                merged.push(fi);
+              }
+            });
+            setLocal(collName, merged);
+          } else {
+            // Push initial local items to Firestore if any exist
+            const localItems = getLocal<any[]>(collName, []);
+            for (const item of localItems) {
+              const docId = item.id || item.uid;
+              if (docId) {
+                this.syncDocToFirestore(collName, docId, item);
+              }
+            }
+          }
+        } catch (innerErr) {
+          console.warn(`Error syncing collection ${collName}:`, innerErr);
+        }
+      }
+    } catch (err) {
+      console.warn('Background Firestore sync (local-first fallback active):', err);
+    }
   }
 
   // AUDIT LOG
@@ -393,12 +370,16 @@ class DataService {
     this.init();
     const users = this.getUsers();
     const idx = users.findIndex(u => u.uid === user.uid || normalizePhoneNumber(u.phone) === normalizePhoneNumber(user.phone));
+    let saved: AdminUser;
     if (idx >= 0) {
-      users[idx] = { ...users[idx], ...user, updatedAt: new Date().toISOString() };
+      saved = { ...users[idx], ...user, updatedAt: new Date().toISOString() };
+      users[idx] = saved;
     } else {
-      users.push({ ...user, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+      saved = { ...user, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+      users.push(saved);
     }
     setLocal('users', users);
+    this.syncDocToFirestore('users', saved.uid, saved);
   }
 
   public updateUserPassword(phone: string, newPasswordPlain: string): boolean {
@@ -411,6 +392,7 @@ class DataService {
     user.mustChangePassword = false;
     user.updatedAt = new Date().toISOString();
     setLocal('users', users);
+    this.syncDocToFirestore('users', user.uid, user);
 
     // Save custom password hash / tracker locally (or Firebase Auth)
     setLocal(`pwd_${norm}`, newPasswordPlain);
@@ -445,6 +427,7 @@ class DataService {
     user.mustChangePassword = true;
     user.updatedAt = new Date().toISOString();
     setLocal('users', users);
+    this.syncDocToFirestore('users', user.uid, user);
     // Remove custom password so it falls back to first 8 digits default password
     if (typeof window !== 'undefined') {
       localStorage.removeItem(getKey(`pwd_${norm}`));
@@ -463,6 +446,7 @@ class DataService {
     if (updates.place !== undefined) user.place = updates.place;
     user.updatedAt = new Date().toISOString();
     setLocal('users', users);
+    this.syncDocToFirestore('users', user.uid, user);
     this.logAudit('Admin Profile Updated', `Admin details updated for ${phone}`, user.name);
     return user;
   }
@@ -483,6 +467,7 @@ class DataService {
 
     const remainingUsers = users.filter(u => u.uid !== uid);
     setLocal('users', remainingUsers);
+    this.deleteDocFromFirestore('users', uid);
 
     // Also remove admin phone from any centers' adminPhones list
     const centers = this.getCenters();
@@ -490,6 +475,7 @@ class DataService {
     centers.forEach(c => {
       if (c.adminPhones && c.adminPhones.includes(user.phone)) {
         c.adminPhones = c.adminPhones.filter(p => p !== user.phone);
+        this.syncDocToFirestore('centers', c.id, c);
         centersChanged = true;
       }
     });
@@ -614,6 +600,7 @@ class DataService {
       centers.push(center);
     }
     setLocal('centers', centers);
+    this.syncDocToFirestore('centers', center.id, center);
     this.logAudit('Center Saved', `Center ${center.name} (${center.id}) saved with status ${center.status}`, 'Admin', center.id);
     return center;
   }
@@ -626,10 +613,12 @@ class DataService {
 
     if (permanent) {
       centers.splice(idx, 1);
+      this.deleteDocFromFirestore('centers', centerId);
       this.logAudit('Center Permanently Deleted', `Center ${centerId} permanently deleted`, 'Super Admin');
     } else {
       centers[idx].status = 'Archived';
       centers[idx].updatedAt = new Date().toISOString();
+      this.syncDocToFirestore('centers', centerId, centers[idx]);
       this.logAudit('Center Archived', `Center ${centerId} archived`, 'Super Admin', centerId);
     }
     setLocal('centers', centers);
@@ -644,6 +633,7 @@ class DataService {
     center.status = status;
     center.updatedAt = new Date().toISOString();
     setLocal('centers', centers);
+    this.syncDocToFirestore('centers', centerId, center);
     this.logAudit('Center Status Changed', `Center ${center.name} status updated to ${status}`, 'Super Admin', centerId);
     return true;
   }
@@ -715,6 +705,7 @@ class DataService {
       students.push(student);
     }
     setLocal('students', students);
+    this.syncDocToFirestore('students', student.id, student);
     this.logAudit('Student Saved', `Student ${student.name} (${student.admissionNumber}) saved`, 'Admin', student.centerId);
     return student;
   }
@@ -727,6 +718,7 @@ class DataService {
     s.status = status;
     s.updatedAt = new Date().toISOString();
     setLocal('students', students);
+    this.syncDocToFirestore('students', s.id, s);
     this.logAudit('Student Status Changed', `Student ${s.name} status updated to ${status}`, 'Admin', s.centerId);
     return true;
   }
@@ -758,6 +750,7 @@ class DataService {
 
     allRecords.push(...newRecords);
     setLocal('attendance', allRecords);
+    newRecords.forEach(r => this.syncDocToFirestore('attendance', r.id, r));
     this.logAudit('Attendance Saved', `Attendance for date ${date} saved (${newRecords.length} students)`, recordedBy, centerId);
   }
 
@@ -826,6 +819,7 @@ class DataService {
     };
     payments.unshift(payment);
     setLocal('feePayments', payments);
+    this.syncDocToFirestore('feePayments', payment.id, payment);
 
     // Update or generate MonthlyFeeRecord
     const student = this.getStudentById(params.studentId);
@@ -845,8 +839,9 @@ class DataService {
       status = 'Partially Paid';
     }
 
+    let updatedFeeRecord: MonthlyFeeRecord;
     if (idx >= 0) {
-      monthlyFees[idx] = {
+      updatedFeeRecord = {
         ...monthlyFees[idx],
         paidAmount: totalPaid,
         outstandingAmount: outstanding,
@@ -855,8 +850,9 @@ class DataService {
         lastPaymentDate: params.paymentDate,
         remarks: params.remarks || monthlyFees[idx].remarks,
       };
+      monthlyFees[idx] = updatedFeeRecord;
     } else {
-      monthlyFees.push({
+      updatedFeeRecord = {
         id: `fee-${params.centerId}-${params.month}-${params.studentId}`,
         centerId: params.centerId,
         studentId: params.studentId,
@@ -868,9 +864,11 @@ class DataService {
         status,
         lastPaymentDate: params.paymentDate,
         remarks: params.remarks,
-      });
+      };
+      monthlyFees.push(updatedFeeRecord);
     }
     setLocal('monthlyFees', monthlyFees);
+    this.syncDocToFirestore('monthlyFees', updatedFeeRecord.id, updatedFeeRecord);
 
     this.logAudit('Fee Payment Recorded', `Payment of ₹${params.amount} recorded for student ${student?.name || params.studentId} for ${params.month}`, params.recordedBy, params.centerId);
     return payment;
@@ -888,6 +886,7 @@ class DataService {
     const monthlyFees = getLocal<MonthlyFeeRecord[]>('monthlyFees', []);
     const idx = monthlyFees.findIndex(m => m.centerId === params.centerId && m.studentId === params.studentId && m.month === params.month);
 
+    let feeRec: MonthlyFeeRecord;
     if (idx >= 0) {
       const rec = monthlyFees[idx];
       rec.expectedFee = params.expectedFee;
@@ -895,8 +894,9 @@ class DataService {
       rec.advanceCredit = Math.max(0, rec.paidAmount - params.expectedFee);
       if (params.status) rec.status = params.status;
       if (params.remarks) rec.remarks = params.remarks;
+      feeRec = rec;
     } else {
-      monthlyFees.push({
+      feeRec = {
         id: `fee-${params.centerId}-${params.month}-${params.studentId}`,
         centerId: params.centerId,
         studentId: params.studentId,
@@ -907,9 +907,11 @@ class DataService {
         advanceCredit: 0,
         status: params.status || 'Unpaid',
         remarks: params.remarks,
-      });
+      };
+      monthlyFees.push(feeRec);
     }
     setLocal('monthlyFees', monthlyFees);
+    this.syncDocToFirestore('monthlyFees', feeRec.id, feeRec);
   }
 
   // DONATIONS
@@ -931,6 +933,7 @@ class DataService {
     };
     donations.unshift(newDonation);
     setLocal('donations', donations);
+    this.syncDocToFirestore('donations', newDonation.id, newDonation);
     this.logAudit('Donation Added', `Donation of ₹${newDonation.amount} recorded from ${newDonation.donorName || 'Anonymous'}`, newDonation.recordedBy, newDonation.centerId);
     return newDonation;
   }
@@ -954,6 +957,7 @@ class DataService {
     };
     expenses.unshift(newExpense);
     setLocal('expenses', expenses);
+    this.syncDocToFirestore('expenses', newExpense.id, newExpense);
     this.logAudit('Expense Recorded', `Expense ₹${newExpense.amount} (${newExpense.category}) recorded`, newExpense.recordedBy, newExpense.centerId);
     return newExpense;
   }
@@ -965,6 +969,7 @@ class DataService {
     if (idx < 0) return false;
     const removed = expenses.splice(idx, 1)[0];
     setLocal('expenses', expenses);
+    this.deleteDocFromFirestore('expenses', expenseId);
     this.logAudit('Expense Deleted', `Expense of ₹${removed.amount} (${removed.category}) deleted`, performedBy, removed.centerId);
     return true;
   }
@@ -1041,6 +1046,7 @@ class DataService {
       exams.push(exam);
     }
     setLocal('exams', exams);
+    this.syncDocToFirestore('exams', exam.id, exam);
     this.logAudit('Exam Saved', `Exam ${exam.name} saved for center ${exam.centerId}`, 'Admin', exam.centerId);
     return exam;
   }
@@ -1052,6 +1058,7 @@ class DataService {
     if (idx < 0) return false;
     const removed = exams.splice(idx, 1)[0];
     setLocal('exams', exams);
+    this.deleteDocFromFirestore('exams', examId);
     this.logAudit('Exam Deleted', `Exam ${removed.name} deleted`, performedBy, removed.centerId);
     return true;
   }
@@ -1085,6 +1092,7 @@ class DataService {
 
     allMarks.push(...newMarks);
     setLocal('examMarks', allMarks);
+    newMarks.forEach(m => this.syncDocToFirestore('examMarks', m.id, m));
     this.logAudit('Exam Marks Recorded', `Marks recorded for exam ${examId} (${newMarks.length} records)`, 'Admin', centerId);
   }
 
@@ -1124,6 +1132,7 @@ class DataService {
     };
     contacts.unshift(newContact);
     setLocal('donatedContacts', contacts);
+    this.syncDocToFirestore('donatedContacts', newContact.id, newContact);
     this.logAudit('Contact Donated', `New admission lead ${newContact.name} (${newContact.phone}) submitted`, 'User', newContact.centerId);
 
     return { success: true, contact: newContact, warningDuplicate: isDuplicate };
@@ -1137,6 +1146,7 @@ class DataService {
     c.status = status;
     c.updatedAt = new Date().toISOString();
     setLocal('donatedContacts', contacts);
+    this.syncDocToFirestore('donatedContacts', c.id, c);
     this.logAudit('Contact Status Updated', `Lead ${c.name} status updated to ${status}`, performedBy, c.centerId);
     return true;
   }
@@ -1148,6 +1158,7 @@ class DataService {
     if (idx < 0) return false;
     const removed = contacts.splice(idx, 1)[0];
     setLocal('donatedContacts', contacts);
+    this.deleteDocFromFirestore('donatedContacts', contactId);
     this.logAudit('Contact Deleted', `Lead ${removed.name} deleted`, performedBy, removed.centerId);
     return true;
   }

@@ -149,7 +149,7 @@ export default function CenterAdminDashboardPage() {
     <AppShell>
       <div className="space-y-6">
         {/* Centre Welcome Banner */}
-        <div className="bg-white p-6 rounded-2xl border border-cre-border shadow-xs flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="bg-white p-4 sm:p-6 rounded-xl sm:rounded-2xl border border-cre-border shadow-xs flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <div className="flex items-center space-x-2">
               <span className="text-[10px] font-bold uppercase tracking-wider text-cre-green">
@@ -167,7 +167,7 @@ export default function CenterAdminDashboardPage() {
             </p>
           </div>
 
-          <div className="flex items-center space-x-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <div className="bg-slate-50 px-3 py-2 rounded-xl border border-cre-border text-xs font-semibold text-slate-800">
               <input
                 type="month"
@@ -179,7 +179,7 @@ export default function CenterAdminDashboardPage() {
 
             <Link
               href="/center-admin/attendance"
-              className="px-4 py-2 text-xs font-bold text-white bg-cre-green hover:bg-cre-green-hover rounded-xl shadow-md shadow-cre-green/20 transition-all inline-flex items-center"
+              className="px-3.5 sm:px-4 py-2 text-xs font-bold text-white bg-cre-green hover:bg-cre-green-hover rounded-xl shadow-md shadow-cre-green/20 transition-all inline-flex items-center"
             >
               <CalendarCheck className="w-4 h-4 mr-1.5" />
               Mark Attendance
@@ -188,179 +188,179 @@ export default function CenterAdminDashboardPage() {
         </div>
 
         {/* Quick Actions (Moved to Top) */}
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-cre-border shadow-xs">
+        <div className="bg-white p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-cre-border shadow-xs">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500">
               Centre Quick Actions
             </span>
-            <span className="text-[10px] font-semibold text-cre-green">
+            <span className="text-[9px] sm:text-[10px] font-semibold text-cre-green">
               Fast management shortcuts
             </span>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-2.5 sm:gap-3">
             <Link
               href="/center-admin/attendance"
-              className="p-3 bg-slate-50 hover:bg-cre-green-light rounded-xl border border-slate-200 hover:border-cre-green transition-all flex items-center space-x-2.5 text-xs font-bold text-cre-navy group"
+              className="p-2.5 sm:p-3 bg-slate-50 hover:bg-cre-green-light rounded-xl border border-slate-200 hover:border-cre-green transition-all flex items-center space-x-2 text-xs font-bold text-cre-navy group"
             >
               <div className="p-1.5 rounded-lg bg-cre-green/10 text-cre-green group-hover:bg-cre-green group-hover:text-white transition-colors shrink-0">
-                <CalendarCheck className="w-4 h-4" />
+                <CalendarCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
-              <span>Mark Attendance</span>
+              <span className="truncate">Mark Attendance</span>
             </Link>
 
             <Link
               href="/center-admin/reports?tab=class_attendance"
-              className="p-3 bg-slate-50 hover:bg-cre-green-light rounded-xl border border-slate-200 hover:border-cre-green transition-all flex items-center space-x-2.5 text-xs font-bold text-cre-navy group"
+              className="p-2.5 sm:p-3 bg-slate-50 hover:bg-cre-green-light rounded-xl border border-slate-200 hover:border-cre-green transition-all flex items-center space-x-2 text-xs font-bold text-cre-navy group"
             >
               <div className="p-1.5 rounded-lg bg-cre-green/10 text-cre-green group-hover:bg-cre-green group-hover:text-white transition-colors shrink-0">
-                <FileText className="w-4 h-4" />
+                <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
-              <span>Attendance Report</span>
+              <span className="truncate">Attendance Report</span>
             </Link>
 
             <Link
               href="/center-admin/students"
-              className="p-3 bg-slate-50 hover:bg-cre-navy-light rounded-xl border border-slate-200 hover:border-cre-navy transition-all flex items-center space-x-2.5 text-xs font-bold text-cre-navy group"
+              className="p-2.5 sm:p-3 bg-slate-50 hover:bg-cre-navy-light rounded-xl border border-slate-200 hover:border-cre-navy transition-all flex items-center space-x-2 text-xs font-bold text-cre-navy group"
             >
               <div className="p-1.5 rounded-lg bg-cre-navy/10 text-cre-navy group-hover:bg-cre-navy group-hover:text-white transition-colors shrink-0">
-                <Users className="w-4 h-4" />
+                <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
-              <span>Register Student</span>
+              <span className="truncate">Register Student</span>
             </Link>
 
             <Link
               href="/center-admin/fees"
-              className="p-3 bg-slate-50 hover:bg-cre-navy-light rounded-xl border border-slate-200 hover:border-cre-navy transition-all flex items-center space-x-2.5 text-xs font-bold text-cre-navy group"
+              className="p-2.5 sm:p-3 bg-slate-50 hover:bg-cre-navy-light rounded-xl border border-slate-200 hover:border-cre-navy transition-all flex items-center space-x-2 text-xs font-bold text-cre-navy group"
             >
               <div className="p-1.5 rounded-lg bg-cre-navy/10 text-cre-navy group-hover:bg-cre-navy group-hover:text-white transition-colors shrink-0">
-                <IndianRupee className="w-4 h-4" />
+                <IndianRupee className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
-              <span>Fee Collection</span>
+              <span className="truncate">Fee Collection</span>
             </Link>
 
             <Link
               href="/center-admin/finance"
-              className="p-3 bg-slate-50 hover:bg-cre-navy-light rounded-xl border border-slate-200 hover:border-cre-navy transition-all flex items-center space-x-2.5 text-xs font-bold text-cre-navy group col-span-2 sm:col-span-1"
+              className="p-2.5 sm:p-3 bg-slate-50 hover:bg-cre-navy-light rounded-xl border border-slate-200 hover:border-cre-navy transition-all flex items-center space-x-2 text-xs font-bold text-cre-navy group col-span-2 sm:col-span-1"
             >
               <div className="p-1.5 rounded-lg bg-cre-navy/10 text-cre-navy group-hover:bg-cre-navy group-hover:text-white transition-colors shrink-0">
-                <Receipt className="w-4 h-4" />
+                <Receipt className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
-              <span>Record Expense</span>
+              <span className="truncate">Record Expense</span>
             </Link>
           </div>
         </div>
 
         {/* 4 ATTENDANCE HERO STAT CARDS */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
           {/* Card 1: Active Enrolled Students */}
-          <div className="bg-white p-5 rounded-2xl border border-cre-border shadow-xs">
+          <div className="bg-white p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-cre-border shadow-xs">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500">
                 Enrolled Students
               </span>
-              <div className="p-2 rounded-xl bg-cre-navy-light text-cre-navy">
-                <Users className="w-4 h-4" />
+              <div className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-cre-navy-light text-cre-navy">
+                <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
             </div>
-            <div className="mt-2 flex items-baseline space-x-2">
-              <span className="text-2xl font-black text-cre-navy">{activeStudents.length}</span>
-              <span className="text-xs text-cre-green font-semibold">Active</span>
+            <div className="mt-1.5 sm:mt-2 flex items-baseline space-x-2">
+              <span className="text-xl sm:text-2xl font-black text-cre-navy">{activeStudents.length}</span>
+              <span className="text-[11px] sm:text-xs text-cre-green font-semibold">Active</span>
             </div>
-            <p className="mt-2 text-[10px] text-slate-400">
+            <p className="mt-1.5 sm:mt-2 text-[9px] sm:text-[10px] text-slate-400">
               Total registered in centre: {students.length}
             </p>
             <Link
               href="/center-admin/students"
-              className="mt-3 text-[11px] font-bold text-cre-green hover:underline flex items-center"
+              className="mt-2 sm:mt-3 text-[10px] sm:text-[11px] font-bold text-cre-green hover:underline flex items-center"
             >
               Student Directory <ArrowRight className="w-3 h-3 ml-1" />
             </Link>
           </div>
 
           {/* Card 2: Overall Attendance Rate % */}
-          <div className="bg-white p-5 rounded-2xl border border-cre-border shadow-xs">
+          <div className="bg-white p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-cre-border shadow-xs">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                Attendance Rate ({selectedMonth})
+              <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                Attendance Rate
               </span>
-              <div className="p-2 rounded-xl bg-cre-green-light text-cre-green">
-                <CalendarCheck className="w-4 h-4" />
+              <div className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-cre-green-light text-cre-green">
+                <CalendarCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
             </div>
-            <div className="mt-2 flex items-baseline space-x-2">
-              <span className="text-2xl font-black text-cre-green">
+            <div className="mt-1.5 sm:mt-2 flex items-baseline space-x-2">
+              <span className="text-xl sm:text-2xl font-black text-cre-green">
                 {monthAttendanceStats.rate}%
               </span>
-              <span className="text-xs text-slate-500">Monthly Avg</span>
+              <span className="text-[10px] sm:text-xs text-slate-500">Monthly Avg</span>
             </div>
-            <p className="mt-2 text-[10px] text-slate-500">
+            <p className="mt-1.5 sm:mt-2 text-[9px] sm:text-[10px] text-slate-500 truncate">
               {monthAttendanceStats.totalPresent} Present of {monthAttendanceStats.totalRecords} attendances
             </p>
             <Link
               href="/center-admin/reports"
-              className="mt-3 text-[11px] font-bold text-cre-navy hover:underline flex items-center"
+              className="mt-2 sm:mt-3 text-[10px] sm:text-[11px] font-bold text-cre-navy hover:underline flex items-center"
             >
-              View Attendance Report <ArrowRight className="w-3 h-3 ml-1" />
+              View Report <ArrowRight className="w-3 h-3 ml-1" />
             </Link>
           </div>
 
           {/* Card 3: Latest Class Attendance */}
-          <div className="bg-white p-5 rounded-2xl border border-cre-border shadow-xs">
+          <div className="bg-white p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-cre-border shadow-xs">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                Latest Class Session
+              <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                Latest Class
               </span>
-              <div className="p-2 rounded-xl bg-cre-green-light text-cre-green">
-                <Calendar className="w-4 h-4" />
+              <div className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-cre-green-light text-cre-green">
+                <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
             </div>
             {latestSession ? (
               <>
-                <div className="mt-2 flex items-baseline space-x-2">
-                  <span className="text-2xl font-black text-cre-navy">
+                <div className="mt-1.5 sm:mt-2 flex items-baseline space-x-2">
+                  <span className="text-xl sm:text-2xl font-black text-cre-navy">
                     {latestSession.present}
                   </span>
-                  <span className="text-xs text-cre-green font-semibold">
-                    / {latestSession.total} Present
+                  <span className="text-[11px] sm:text-xs text-cre-green font-semibold">
+                    / {latestSession.total}
                   </span>
                 </div>
-                <div className="mt-2 flex items-center space-x-2 text-[10px]">
+                <div className="mt-1.5 sm:mt-2 flex flex-wrap items-center gap-1 text-[9px] sm:text-[10px]">
                   <span className="px-1.5 py-0.5 rounded-sm bg-red-50 text-red-700 font-bold">
                     {latestSession.absent} Absent
                   </span>
                   <span className="px-1.5 py-0.5 rounded-sm bg-cre-green-light text-cre-green font-bold">
-                    {latestSession.rate}% Turnout
+                    {latestSession.rate}%
                   </span>
                 </div>
-                <p className="mt-2 text-[10px] text-slate-400">Date: {latestSession.date}</p>
+                <p className="mt-1.5 sm:mt-2 text-[9px] sm:text-[10px] text-slate-400">Date: {latestSession.date}</p>
               </>
             ) : (
-              <p className="mt-3 text-xs text-slate-400">No sessions recorded yet</p>
+              <p className="mt-2 sm:mt-3 text-xs text-slate-400">No sessions recorded yet</p>
             )}
           </div>
 
           {/* Card 4: Classes Conducted */}
-          <div className="bg-white p-5 rounded-2xl border border-cre-border shadow-xs">
+          <div className="bg-white p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-cre-border shadow-xs">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500">
                 Conducted Classes
               </span>
-              <div className="p-2 rounded-xl bg-cre-navy-light text-cre-navy">
-                <TrendingUp className="w-4 h-4" />
+              <div className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-cre-navy-light text-cre-navy">
+                <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
             </div>
-            <div className="mt-2 flex items-baseline space-x-2">
-              <span className="text-2xl font-black text-cre-navy">
+            <div className="mt-1.5 sm:mt-2 flex items-baseline space-x-2">
+              <span className="text-xl sm:text-2xl font-black text-cre-navy">
                 {monthAttendanceStats.conducted}
               </span>
-              <span className="text-xs text-slate-500">Sessions in Month</span>
+              <span className="text-[10px] sm:text-xs text-slate-500">In Month</span>
             </div>
-            <p className="mt-2 text-[10px] text-slate-500">
-              {sessionDates.length} Total classes conducted all-time
+            <p className="mt-1.5 sm:mt-2 text-[9px] sm:text-[10px] text-slate-500">
+              {sessionDates.length} Total classes all-time
             </p>
             <Link
               href="/center-admin/attendance"
-              className="mt-3 text-[11px] font-bold text-cre-green hover:underline flex items-center"
+              className="mt-2 sm:mt-3 text-[10px] sm:text-[11px] font-bold text-cre-green hover:underline flex items-center"
             >
               Class Register <ArrowRight className="w-3 h-3 ml-1" />
             </Link>
@@ -368,15 +368,15 @@ export default function CenterAdminDashboardPage() {
         </div>
 
         {/* ATTENDANCE VISUALIZATION & WEEKLY TRENDS */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Main Attendance Chart */}
-          <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-cre-border shadow-xs">
-            <div className="flex items-center justify-between mb-4">
+          <div className="lg:col-span-2 bg-white p-4 sm:p-6 rounded-xl sm:rounded-2xl border border-cre-border shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
               <div>
-                <h3 className="text-sm font-bold text-cre-navy">
+                <h3 className="text-xs sm:text-sm font-bold text-cre-navy">
                   Weekly Class Attendance Trend
                 </h3>
-                <p className="text-[11px] text-slate-500">
+                <p className="text-[10px] sm:text-[11px] text-slate-500">
                   Number of present and absent students for each weekly class
                 </p>
               </div>
@@ -392,34 +392,41 @@ export default function CenterAdminDashboardPage() {
               </div>
             </div>
 
-            <div className="h-64 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis dataKey="dateLabel" stroke="#94a3b8" fontSize={11} />
-                  <YAxis stroke="#94a3b8" fontSize={11} allowDecimals={false} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#ffffff',
-                      borderColor: '#e2e8f0',
-                      borderRadius: '12px',
-                      fontSize: '11px',
-                    }}
-                  />
-                  <Bar dataKey="Present Students" fill="#2fb44b" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Absent Students" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            {chartData.length === 0 ? (
+              <div className="h-40 sm:h-64 flex flex-col items-center justify-center text-slate-400 text-xs">
+                <CalendarCheck className="w-8 h-8 text-slate-300 mb-2" />
+                <p>No class attendance sessions recorded yet.</p>
+              </div>
+            ) : (
+              <div className="h-48 sm:h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <XAxis dataKey="dateLabel" stroke="#94a3b8" fontSize={10} />
+                    <YAxis stroke="#94a3b8" fontSize={10} allowDecimals={false} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#ffffff',
+                        borderColor: '#e2e8f0',
+                        borderRadius: '12px',
+                        fontSize: '11px',
+                      }}
+                    />
+                    <Bar dataKey="Present Students" fill="#2fb44b" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="Absent Students" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
           </div>
 
           {/* Attendance Health & Follow-up Needed */}
-          <div className="bg-white p-6 rounded-2xl border border-cre-border shadow-xs flex flex-col justify-between">
+          <div className="bg-white p-4 sm:p-6 rounded-xl sm:rounded-2xl border border-cre-border shadow-xs flex flex-col justify-between">
             <div>
-              <h3 className="text-sm font-bold text-cre-navy mb-1">
+              <h3 className="text-xs sm:text-sm font-bold text-cre-navy mb-1">
                 Attendance Health Overview
               </h3>
-              <p className="text-[11px] text-slate-500 mb-4">
+              <p className="text-[10px] sm:text-[11px] text-slate-500 mb-4">
                 Student consistency for {selectedMonth}
               </p>
 
@@ -470,7 +477,7 @@ export default function CenterAdminDashboardPage() {
         </div>
 
         {/* RECENT CLASS SESSIONS TABLE */}
-        <div className="bg-white rounded-2xl border border-cre-border shadow-xs p-6">
+        <div className="bg-white rounded-xl sm:rounded-2xl border border-cre-border shadow-xs p-4 sm:p-6">
           <div className="flex items-center justify-between mb-4 pb-2 border-b border-cre-border">
             <div>
               <h3 className="text-sm font-bold text-cre-navy">

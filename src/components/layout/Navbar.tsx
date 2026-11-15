@@ -62,29 +62,29 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileMenu, isMobileMenu
 
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-cre-border shadow-xs">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-18">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-14 sm:h-17">
           {/* Left: Brand Logos & Title */}
-          <div className="flex items-center space-x-3 sm:space-x-4">
+          <div className="flex items-center space-x-2 sm:space-x-4">
             {role && (
               <button
                 type="button"
                 onClick={onToggleMobileMenu}
-                className="lg:hidden p-2 rounded-md text-cre-navy hover:bg-cre-navy-light transition-colors"
+                className="lg:hidden p-1.5 rounded-lg text-cre-navy hover:bg-cre-navy-light transition-colors"
                 aria-label="Toggle Navigation Menu"
               >
-                {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+                {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </button>
             )}
 
-            <Link href="/" className="flex items-center space-x-3 group">
-              <div className="relative h-11 w-28 sm:w-32 flex items-center">
+            <Link href="/" className="flex items-center space-x-2 sm:space-x-3 group">
+              <div className="relative h-8 w-22 sm:h-11 sm:w-32 flex items-center">
                 <Image
                   src="/cre-logo.png"
                   alt="CRE Logo"
                   width={140}
                   height={50}
-                  className="object-contain max-h-11"
+                  className="object-contain max-h-8 sm:max-h-11"
                   priority
                 />
               </div>
