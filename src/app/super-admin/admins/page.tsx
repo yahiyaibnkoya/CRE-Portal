@@ -1,0 +1,483 @@
+'use client';
+
+import React, { useState } from 'react';
+import { AppShell } from '@/components/layout/AppShell';
+import { useAuth } from '@/context/AuthContext';
+import { dataService } from '@/lib/dataService';
+import { AdminUser, Center } from '@/types';
+import { normalizePhoneNumber, getDefaultPassword } from '@/lib/constants';
+import {
+  ShieldCheck,
+  UserPlus,
+  Search,
+  KeyRound,
+  Building,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  RefreshCw,
+  Edit2,
+  X,
+  Phone,
+} from 'lucide-react';
+
+export default function SuperAdminAdminsPage() {
+  const { adminUser: currentSuperAdmin, refreshData } = useAuth();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [centerFilter, setCenterFilter] = useState('ALL');
+
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingAdmin, setEditingAdmin] = useState<AdminUser | null>(null);
+  const [resettingUser, setResettingUser] = useState<AdminUser | null>(null);
+
+  // Form State
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [selectedCenterIds, setSelectedCenterIds] = useState<string[]>([]);
+  const [role, setRole] = useState<'CENTER_ADMIN' | 'SUPER_ADMIN'>('CENTER_ADMIN');
+  const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  const centers = dataService.getCenters();
+  const users = dataService.getUsers();
+
+  const filteredUsers = users.filter((u) => {
+    if (centerFilter !== 'ALL') {
+      if (!u.centerIds.includes(centerFilter)) return false;
+    }
+    if (searchTerm) {
+      const q = searchTerm.toLowerCase();
+      const matchName = u.name.toLowerCase().includes(q);
+      const matchPhone = u.phone.includes(q);
+      return matchName || matchPhone;
+    }
+    return true;
+  });
+
+  const handleOpenAdd = () => {
+    setEditingAdmin(null);
+    setName('');
+    setPhone('');
+    setSelectedCenterIds(centers.length > 0 ? [centers[0].id] : []);
+    setRole('CENTER_ADMIN');
+    setError(null);
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEdit = (user: AdminUser) => {
+    setEditingAdmin(user);
+    setName(user.name);
+    setPhone(user.phone);
+    setSelectedCenterIds(user.centerIds);
+    setRole(user.role);
+    setError(null);
+    setIsModalOpen(true);
+  };
+
+  const handleSaveAdmin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    const cleanPhone = normalizePhoneNumber(phone);
+
+    if (cleanPhone.length < 10) {
+      setError('Please provide a valid 10-digit mobile number.');
+      return;
+    }
+
+    // Check 3 administrator limit per centre
+    if (role === 'CENTER_ADMIN') {
+      for (const cId of selectedCenterIds) {
+        const center = dataService.getCenterById(cId);
+        const existingAdminsForCenter = users.filter(
+          (u) => u.isActive && u.centerIds.includes(cId) && u.uid !== editingAdmin?.uid
+        );
+        if (existingAdminsForCenter.length >= 3) {
+          setError(`Centre "${center?.name || cId}" already has the maximum of 3 active administrators.`);
+          return;
+        }
+      }
+    }
+
+    const defaultPwd = getDefaultPassword(cleanPhone);
+
+    const updatedUser: AdminUser = {
+      uid: editingAdmin ? editingAdmin.uid : 'admin-' + Date.now().toString(36),
+      phone: cleanPhone,
+      name,
+      role,
+      centerIds: selectedCenterIds,
+      mustChangePassword: editingAdmin ? editingAdmin.mustChangePassword : true,
+      isActive: editingAdmin ? editingAdmin.isActive : true,
+      createdAt: editingAdmin ? editingAdmin.createdAt : new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    dataService.saveUser(updatedUser);
+    setIsModalOpen(false);
+    setSuccessMsg(
+      `Administrator saved. Initial password: ${defaultPwd} (Compulsory change required on first login)`
+    );
+    setTimeout(() => setSuccessMsg(null), 6000);
+    refreshData();
+  };
+
+  const handleToggleActive = (user: AdminUser) => {
+    const updated = { ...user, isActive: !user.isActive };
+    dataService.saveUser(updated);
+    refreshData();
+  };
+
+  const handleConfirmResetPassword = () => {
+    if (!resettingUser) return;
+    dataService.resetUserPassword(resettingUser.phone, currentSuperAdmin?.name || 'Super Admin');
+    setSuccessMsg(
+      `Password for ${resettingUser.phone} reset to default (${getDefaultPassword(
+        resettingUser.phone
+      )}). First login password change enforced.`
+    );
+    setResettingUser(null);
+    setTimeout(() => setSuccessMsg(null), 6000);
+    refreshData();
+  };
+
+  return (
+    <AppShell>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-cre-border">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-black text-cre-navy">
+              Centre Administrators
+            </h1>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Manage authorized administrator logins and password credentials
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleOpenAdd}
+            className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-cre-green hover:bg-cre-green-hover transition-all shadow-md shadow-cre-green/20"
+          >
+            <UserPlus className="w-4 h-4 mr-1.5" />
+            Add Administrator
+          </button>
+        </div>
+
+        {/* Success Alert */}
+        {successMsg && (
+          <div className="p-4 bg-cre-green-light border border-cre-green/30 rounded-2xl flex items-center space-x-3 text-xs text-cre-green font-bold shadow-xs">
+            <CheckCircle className="w-5 h-5 shrink-0" />
+            <span>{successMsg}</span>
+          </div>
+        )}
+
+        {/* Filter Bar */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="relative">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search administrator by name or phone..."
+              className="w-full pl-10 pr-4 py-2 text-xs border border-cre-border rounded-xl bg-white focus:ring-2 focus:ring-cre-green focus:outline-hidden"
+            />
+          </div>
+
+          <div className="flex items-center space-x-2 bg-white px-3 py-2 rounded-xl border border-cre-border text-xs">
+            <span className="text-slate-400 font-medium">Filter by Centre:</span>
+            <select
+              value={centerFilter}
+              onChange={(e) => setCenterFilter(e.target.value)}
+              className="bg-transparent text-slate-800 font-semibold focus:outline-hidden cursor-pointer w-full"
+            >
+              <option value="ALL">All Centres</option>
+              {centers.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Table List */}
+        <div className="bg-white rounded-2xl border border-cre-border shadow-xs overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 border-b border-cre-border text-[11px] font-bold text-cre-navy uppercase tracking-wider">
+                <tr>
+                  <th className="py-3.5 px-4">Administrator</th>
+                  <th className="py-3.5 px-4">Mobile / Username</th>
+                  <th className="py-3.5 px-4">Role</th>
+                  <th className="py-3.5 px-4">Assigned Centre(s)</th>
+                  <th className="py-3.5 px-4">Password Status</th>
+                  <th className="py-3.5 px-4">Account Status</th>
+                  <th className="py-3.5 px-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-cre-border">
+                {filteredUsers.map((u) => {
+                  const assignedCenters = centers.filter((c) => u.centerIds.includes(c.id));
+
+                  return (
+                    <tr key={u.uid} className="hover:bg-slate-50/70 transition-colors">
+                      <td className="py-3.5 px-4">
+                        <span className="font-bold text-slate-900 block">{u.name}</span>
+                        <span className="text-[10px] text-slate-400">UID: {u.uid}</span>
+                      </td>
+                      <td className="py-3.5 px-4 font-mono font-semibold text-cre-navy">
+                        {u.phone}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span
+                          className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                            u.role === 'SUPER_ADMIN'
+                              ? 'bg-cre-navy text-white'
+                              : 'bg-cre-navy-light text-cre-navy'
+                          }`}
+                        >
+                          {u.role === 'SUPER_ADMIN' ? 'Super Admin' : 'Centre Admin'}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        {u.role === 'SUPER_ADMIN' ? (
+                          <span className="text-[11px] font-semibold text-cre-green">
+                            Global Platform Access
+                          </span>
+                        ) : assignedCenters.length > 0 ? (
+                          <div className="space-y-1">
+                            {assignedCenters.map((c) => (
+                              <span
+                                key={c.id}
+                                className="inline-block text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md font-medium mr-1"
+                              >
+                                {c.name}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-amber-600 text-[10px] italic">No Centre Assigned</span>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        {u.mustChangePassword ? (
+                          <span className="inline-flex items-center text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                            Default (Change Pending)
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center text-[10px] font-bold text-cre-green bg-cre-green-light px-2 py-0.5 rounded-full border border-cre-green/30">
+                            Custom Password Set
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleActive(u)}
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition-colors ${
+                            u.isActive
+                              ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
+                              : 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200'
+                          }`}
+                        >
+                          {u.isActive ? 'Active' : 'Suspended'}
+                        </button>
+                      </td>
+                      <td className="py-3.5 px-4 text-right">
+                        <div className="inline-flex items-center space-x-1">
+                          <button
+                            type="button"
+                            onClick={() => setResettingUser(u)}
+                            className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                            title="Reset to default password"
+                          >
+                            <KeyRound className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(u)}
+                            className="p-1.5 text-slate-500 hover:text-cre-navy hover:bg-slate-100 rounded-lg transition-colors"
+                            title="Edit Administrator"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* ADD / EDIT ADMIN MODAL */}
+        {isModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-cre-border">
+              <div className="flex items-center justify-between pb-3 border-b border-cre-border">
+                <div className="flex items-center space-x-2.5">
+                  <div className="p-2 rounded-xl bg-cre-green-light text-cre-green">
+                    <UserPlus className="w-5 h-5" />
+                  </div>
+                  <h3 className="text-sm font-bold text-cre-navy">
+                    {editingAdmin ? 'Edit Administrator' : 'Create Administrator Account'}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {error && (
+                <div className="my-3 p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-center space-x-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleSaveAdmin} className="mt-4 space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Full Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g. Farooq K."
+                    className="w-full px-3.5 py-2 text-xs border border-cre-border rounded-xl focus:ring-2 focus:ring-cre-green focus:outline-hidden"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Registered Mobile Number (Username) *
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                      <Phone className="w-3.5 h-3.5" />
+                    </div>
+                    <input
+                      type="tel"
+                      required
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="e.g. 9876543210"
+                      className="w-full pl-9 pr-3.5 py-2 text-xs border border-cre-border rounded-xl focus:ring-2 focus:ring-cre-green focus:outline-hidden"
+                    />
+                  </div>
+                  <p className="mt-1 text-[11px] text-slate-400">
+                    Default initial password will be set to: <span className="font-semibold text-cre-green">{phone ? getDefaultPassword(phone) : 'First 8 digits'}</span>
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    System Role
+                  </label>
+                  <select
+                    value={role}
+                    onChange={(e) => setRole(e.target.value as 'CENTER_ADMIN' | 'SUPER_ADMIN')}
+                    className="w-full px-3.5 py-2 text-xs border border-cre-border rounded-xl font-semibold"
+                  >
+                    <option value="CENTER_ADMIN">Centre Administrator (Max 3 per centre)</option>
+                    <option value="SUPER_ADMIN">Super Administrator (Global)</option>
+                  </select>
+                </div>
+
+                {role === 'CENTER_ADMIN' && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Assigned CRE Centre(s)
+                    </label>
+                    <div className="max-h-36 overflow-y-auto space-y-1.5 p-2 bg-slate-50 border border-cre-border rounded-xl">
+                      {centers.map((c) => (
+                        <label key={c.id} className="flex items-center space-x-2 text-xs text-slate-700 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedCenterIds.includes(c.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedCenterIds([...selectedCenterIds, c.id]);
+                              } else {
+                                setSelectedCenterIds(selectedCenterIds.filter((id) => id !== c.id));
+                              }
+                            }}
+                            className="rounded-sm text-cre-green focus:ring-cre-green"
+                          />
+                          <span className="font-medium">{c.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="pt-3 border-t border-cre-border flex items-center justify-end space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsModalOpen(false)}
+                    className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 text-xs font-bold text-white bg-cre-green hover:bg-cre-green-hover rounded-xl shadow-xs"
+                  >
+                    Save Administrator
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* PASSWORD RESET CONFIRMATION MODAL */}
+        {resettingUser && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
+            <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-cre-border text-center">
+              <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto mb-3">
+                <KeyRound className="w-6 h-6" />
+              </div>
+              <h3 className="text-sm font-bold text-cre-navy">
+                Reset Administrator Password
+              </h3>
+              <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+                Reset password for <span className="font-bold text-cre-navy">{resettingUser.name}</span> ({resettingUser.phone}) to the default first 8 digits ({getDefaultPassword(resettingUser.phone)})?
+              </p>
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl my-4 text-[11px] text-slate-500">
+                This administrator will be required to create a new password immediately upon their next login.
+              </div>
+
+              <div className="flex items-center justify-center space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setResettingUser(null)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmResetPassword}
+                  className="px-4 py-2 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-xl shadow-xs"
+                >
+                  Reset Password
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </AppShell>
+  );
+}
