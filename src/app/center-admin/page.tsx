@@ -185,6 +185,8 @@ export default function CenterAdminDashboardPage() {
               Mark Attendance
             </Link>
           </div>
+        </div>
+
         {/* Quick Actions (Moved to Top) */}
         <div className="bg-white p-4 sm:p-5 rounded-2xl border border-cre-border shadow-xs">
           <div className="flex items-center justify-between mb-3">
@@ -550,8 +552,6 @@ export default function CenterAdminDashboardPage() {
               </tbody>
             </table>
           </div>
-        </div>
-
         </div>
       </div>
     </AppShell>
