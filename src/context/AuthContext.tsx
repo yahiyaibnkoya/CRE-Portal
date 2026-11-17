@@ -81,12 +81,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     if (isLoading) return;
 
-    // Check if user must change password
-    if (adminUser?.mustChangePassword && pathname !== '/change-password' && pathname !== '/login') {
-      router.push('/change-password');
-      return;
-    }
-
     // Protect Super Admin routes
     if (pathname?.startsWith('/super-admin')) {
       if (role !== 'SUPER_ADMIN') {
@@ -139,9 +133,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginAdmin = async (phone: string, passwordPlain: string) => {
     dataService.init();
     const cleanPhone = normalizePhoneNumber(phone);
+
+    // Multi-device sync: ensure local storage is up-to-date with Firestore
+    try {
+      await dataService.ensureSynced();
+    } catch {
+      // Offline fallback
+    }
+
     let user = dataService.getUserByPhone(cleanPhone);
 
-    // Multi-device support: fetch directly from Firestore if not in local cache
+    // Multi-device fallback: fetch directly from Firestore if still not in local cache
     if (!user) {
       user = (await dataService.fetchUserFromFirestore(cleanPhone)) || undefined;
     }

@@ -137,102 +137,8 @@ class DataService {
   public init() {
     if (this.inited || typeof window === 'undefined') return;
 
-    // 1. One-time clean purge of all demo data (Manjeri demo center, demo students, demo admins)
-    const purgeDone = localStorage.getItem(getKey('demo_purged_v2'));
-    if (!purgeDone) {
-      const demoCenterId = 'center-manjeri-01';
-      const demoPhones = ['9876543210', '9999999999'];
-
-      // Purge users
-      const currentUsers = getLocal<AdminUser[]>('users', []);
-      const cleanUsers = currentUsers.filter(
-        (u) => !demoPhones.includes(normalizePhoneNumber(u.phone)) && !u.name.toLowerCase().includes('demo')
-      );
-      if (!cleanUsers.some((u) => normalizePhoneNumber(u.phone) === SUPER_ADMIN_DEFAULT_PHONE)) {
-        cleanUsers.unshift({
-          uid: 'super-admin-01',
-          phone: SUPER_ADMIN_DEFAULT_PHONE,
-          name: 'Wisdom Super Admin',
-          role: 'SUPER_ADMIN',
-          centerIds: [],
-          mustChangePassword: true,
-          isActive: true,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
-      }
-      setLocal('users', cleanUsers);
-
-      // Purge centers: remove demo center
-      const currentCenters = getLocal<Center[]>('centers', []);
-      setLocal(
-        'centers',
-        currentCenters.filter((c) => c.id !== demoCenterId && c.name !== 'Manjeri CRE Centre')
-      );
-
-      // Purge students: remove any demo students
-      const currentStudents = getLocal<Student[]>('students', []);
-      setLocal(
-        'students',
-        currentStudents.filter((s) => s.centerId !== demoCenterId && !s.id.startsWith('std-00'))
-      );
-
-      // Purge attendance
-      const currentAtt = getLocal<AttendanceRecord[]>('attendance', []);
-      setLocal(
-        'attendance',
-        currentAtt.filter((a) => a.centerId !== demoCenterId && !a.id.startsWith('att-'))
-      );
-
-      // Purge fees
-      const currentFees = getLocal<MonthlyFeeRecord[]>('monthlyFees', []);
-      setLocal(
-        'monthlyFees',
-        currentFees.filter((f) => f.centerId !== demoCenterId && !f.id.startsWith('fee-00'))
-      );
-
-      const currentPay = getLocal<FeePayment[]>('feePayments', []);
-      setLocal(
-        'feePayments',
-        currentPay.filter((p) => p.centerId !== demoCenterId && !p.id.startsWith('pay-00'))
-      );
-
-      // Purge expenses
-      const currentExp = getLocal<Expense[]>('expenses', []);
-      setLocal(
-        'expenses',
-        currentExp.filter((e) => e.centerId !== demoCenterId && !e.id.startsWith('exp-00'))
-      );
-
-      // Purge donations
-      const currentDon = getLocal<Donation[]>('donations', []);
-      setLocal(
-        'donations',
-        currentDon.filter((d) => d.centerId !== demoCenterId && !d.id.startsWith('don-00'))
-      );
-
-      // Purge exams
-      const currentExams = getLocal<Exam[]>('exams', []);
-      setLocal(
-        'exams',
-        currentExams.filter((e) => e.centerId !== demoCenterId && e.id !== 'exam-001')
-      );
-
-      const currentMarks = getLocal<ExamMark[]>('examMarks', []);
-      setLocal(
-        'examMarks',
-        currentMarks.filter((m) => m.centerId !== demoCenterId && !m.id.startsWith('mrk-'))
-      );
-
-      // Purge contacts
-      const currentContacts = getLocal<DonatedContact[]>('donatedContacts', []);
-      setLocal(
-        'donatedContacts',
-        currentContacts.filter((c) => c.centerId !== demoCenterId && c.id !== 'dc-001')
-      );
-
-      localStorage.setItem(getKey('demo_purged_v2'), 'true');
-    }
+    // 1. One-time clean purge is marked complete without modifying any real data
+    localStorage.setItem(getKey('demo_purged_v2'), 'true');
 
     // 2. Migration for 4-Digit Password PIN
     const v3Done = localStorage.getItem(getKey('migration_v3_4digit_pin'));
@@ -291,16 +197,56 @@ class DataService {
     if (!db || typeof window === 'undefined') return null;
     try {
       const norm = normalizePhoneNumber(phone);
-      const q = query(collection(db, 'users'), where('phone', '==', norm));
-      const snap = await getDocs(q);
+      // 1. Try direct Firestore query
+      let snap = await getDocs(query(collection(db, 'users'), where('phone', '==', norm)));
+
+      // 2. If not found, fetch all user docs (handles any formatting variations across devices)
+      if (snap.empty) {
+        snap = await getDocs(collection(db, 'users'));
+      }
+
       if (!snap.empty) {
-        const u = snap.docs[0].data() as AdminUser;
         const users = this.getUsers();
-        const idx = users.findIndex(item => item.uid === u.uid || normalizePhoneNumber(item.phone) === norm);
-        if (idx >= 0) users[idx] = u;
-        else users.push(u);
+        let matchedUser: AdminUser | null = null;
+
+        snap.forEach((d) => {
+          const u = d.data() as AdminUser;
+          const uNorm = normalizePhoneNumber(u.phone);
+          const idx = users.findIndex(
+            (item) => item.uid === u.uid || normalizePhoneNumber(item.phone) === uNorm
+          );
+          if (idx >= 0) {
+            users[idx] = { ...users[idx], ...u };
+          } else {
+            users.push(u);
+          }
+
+          if (uNorm === norm) {
+            matchedUser = u;
+          }
+        });
+
         setLocal('users', users);
-        return u;
+
+        // Also sync centers to guarantee the centre object exists on this device
+        try {
+          const centersSnap = await getDocs(collection(db, 'centers'));
+          if (!centersSnap.empty) {
+            const localCenters = this.getCenters();
+            const mergedCenters = [...localCenters];
+            centersSnap.forEach((cd) => {
+              const c = cd.data() as Center;
+              const cIdx = mergedCenters.findIndex((item) => item.id === c.id);
+              if (cIdx >= 0) mergedCenters[cIdx] = c;
+              else mergedCenters.push(c);
+            });
+            setLocal('centers', mergedCenters);
+          }
+        } catch {
+          // Non-critical
+        }
+
+        return matchedUser;
       }
     } catch (err) {
       console.warn('Error fetching user from Firestore:', err);
@@ -314,6 +260,9 @@ class DataService {
       const norm = normalizePhoneNumber(phone);
       const snap = await getDocs(collection(db, 'students'));
       const matching: Student[] = [];
+      const local = getLocal<Student[]>('students', []);
+      const merged = [...local];
+
       snap.forEach((d) => {
         const s = d.data() as Student;
         const pPhone = normalizePhoneNumber(s.parentPhone || '');
@@ -321,17 +270,12 @@ class DataService {
         if (pPhone === norm || sPhone === norm) {
           matching.push(s);
         }
+        const idx = merged.findIndex((x) => x.id === s.id);
+        if (idx >= 0) merged[idx] = s;
+        else merged.push(s);
       });
-      if (matching.length > 0) {
-        const local = getLocal<Student[]>('students', []);
-        const merged = [...local];
-        matching.forEach((ms) => {
-          const idx = merged.findIndex((x) => x.id === ms.id);
-          if (idx >= 0) merged[idx] = ms;
-          else merged.push(ms);
-        });
-        setLocal('students', merged);
-      }
+
+      setLocal('students', merged);
       return matching;
     } catch (err) {
       console.warn('Error fetching students from Firestore:', err);
@@ -359,29 +303,40 @@ class DataService {
       for (const collName of collectionsToSync) {
         try {
           const snap = await getDocs(collection(db, collName));
+          const localItems = getLocal<any[]>(collName, []);
+          const firestoreItems: any[] = [];
           if (!snap.empty) {
-            const firestoreItems: any[] = [];
             snap.forEach((d) => firestoreItems.push(d.data()));
-            const localItems = getLocal<any[]>(collName, []);
-            const merged = [...localItems];
-            firestoreItems.forEach((fi) => {
-              const idField = fi.id ? 'id' : fi.uid ? 'uid' : null;
-              if (idField) {
-                const idx = merged.findIndex((m) => m[idField] === fi[idField]);
-                if (idx >= 0) merged[idx] = fi;
-                else merged.push(fi);
+          }
+
+          // 1. Inbound: Merge Firestore items into local storage
+          const merged = [...localItems];
+          firestoreItems.forEach((fi) => {
+            const idField = fi.id ? 'id' : fi.uid ? 'uid' : null;
+            if (idField) {
+              const idx = merged.findIndex((m) => m[idField] === fi[idField]);
+              if (idx >= 0) {
+                const localTime = new Date(merged[idx].updatedAt || 0).getTime();
+                const cloudTime = new Date(fi.updatedAt || 0).getTime();
+                if (cloudTime >= localTime) {
+                  merged[idx] = fi;
+                }
               } else {
                 merged.push(fi);
               }
-            });
-            setLocal(collName, merged);
-          } else {
-            // Push initial local items to Firestore if any exist
-            const localItems = getLocal<any[]>(collName, []);
-            for (const item of localItems) {
-              const docId = item.id || item.uid;
-              if (docId) {
-                this.syncDocToFirestore(collName, docId, item);
+            } else {
+              merged.push(fi);
+            }
+          });
+          setLocal(collName, merged);
+
+          // 2. Outbound: Push any local items missing in Firestore up to Firestore
+          for (const item of merged) {
+            const idField = item.id ? 'id' : item.uid ? 'uid' : null;
+            if (idField && item[idField]) {
+              const inCloud = firestoreItems.some((fi) => fi[idField] === item[idField]);
+              if (!inCloud) {
+                await this.syncDocToFirestore(collName, item[idField], item);
               }
             }
           }
@@ -447,13 +402,15 @@ class DataService {
   public saveUser(user: AdminUser): void {
     this.init();
     const users = this.getUsers();
-    const idx = users.findIndex(u => u.uid === user.uid || normalizePhoneNumber(u.phone) === normalizePhoneNumber(user.phone));
+    const normPhone = normalizePhoneNumber(user.phone);
+    const pin = user.passwordPin || getDefaultPassword(normPhone);
+    const idx = users.findIndex(u => u.uid === user.uid || normalizePhoneNumber(u.phone) === normPhone);
     let saved: AdminUser;
     if (idx >= 0) {
-      saved = { ...users[idx], ...user, updatedAt: new Date().toISOString() };
+      saved = { ...users[idx], ...user, phone: normPhone, passwordPin: pin, updatedAt: new Date().toISOString() };
       users[idx] = saved;
     } else {
-      saved = { ...user, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+      saved = { ...user, phone: normPhone, passwordPin: pin, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
       users.push(saved);
     }
     setLocal('users', users);
@@ -809,6 +766,23 @@ class DataService {
     setLocal('students', students);
     this.syncDocToFirestore('students', s.id, s);
     this.logAudit('Student Status Changed', `Student ${s.name} status updated to ${status}`, 'Admin', s.centerId);
+    return true;
+  }
+
+  public deleteStudent(studentId: string, performedBy?: string): boolean {
+    this.init();
+    const students = this.getStudents();
+    const s = students.find(item => item.id === studentId);
+    if (!s) return false;
+    const remaining = students.filter(item => item.id !== studentId);
+    setLocal('students', remaining);
+    this.deleteDocFromFirestore('students', studentId);
+    this.logAudit(
+      'Student Deleted',
+      `Student ${s.name} (${s.admissionNumber}) permanently removed by ${performedBy || 'Admin'}`,
+      performedBy || 'Admin',
+      s.centerId
+    );
     return true;
   }
 

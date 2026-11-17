@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { getAuth, Auth } from 'firebase/auth';
+import { getAuth, Auth, signInAnonymously } from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
 import { getAnalytics, isSupported, Analytics } from 'firebase/analytics';
 
@@ -36,6 +36,14 @@ if (!getApps().length) {
       }).catch(() => {
         // Safe ignore for environments without analytics support
       });
+
+      // Silently sign in anonymously to satisfy any request.auth security rules
+      if (auth) {
+        signInAnonymously(auth).catch((err) => {
+          // Normal if anonymous provider is not toggled on in console; open firestore.rules will handle it
+          console.debug('Multi-device auth token init:', err?.code || err?.message);
+        });
+      }
     }
   }
 } else {

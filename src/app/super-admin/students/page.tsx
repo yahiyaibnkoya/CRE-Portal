@@ -5,6 +5,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { useAuth } from '@/context/AuthContext';
 import { dataService } from '@/lib/dataService';
 import { Student } from '@/types';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import {
   Users,
   Search,
@@ -17,13 +18,23 @@ import {
   Eye,
   IndianRupee,
   X,
+  Trash2,
 } from 'lucide-react';
 
 export default function SuperAdminStudentsPage() {
+  const { refreshData } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [centerFilter, setCenterFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [viewingStudent, setViewingStudent] = useState<Student | null>(null);
+  const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
+
+  const handleConfirmDeleteStudent = () => {
+    if (!studentToDelete) return;
+    dataService.deleteStudent(studentToDelete.id, 'Super Admin');
+    setStudentToDelete(null);
+    refreshData();
+  };
 
   const centers = dataService.getCenters();
   const allStudents = dataService.getStudents();
@@ -172,14 +183,24 @@ export default function SuperAdminStudentsPage() {
                         </span>
                       </td>
                       <td className="py-3.5 px-4 text-right">
-                        <button
-                          type="button"
-                          onClick={() => setViewingStudent(s)}
-                          className="p-1.5 text-slate-500 hover:text-cre-navy hover:bg-slate-100 rounded-lg transition-colors"
-                          title="View Student Profile"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center justify-end space-x-1">
+                          <button
+                            type="button"
+                            onClick={() => setViewingStudent(s)}
+                            className="p-1.5 text-slate-500 hover:text-cre-navy hover:bg-slate-100 rounded-lg transition-colors"
+                            title="View Student Profile"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setStudentToDelete(s)}
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Delete Student"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -275,6 +296,20 @@ export default function SuperAdminStudentsPage() {
             </div>
           </div>
         )}
+
+        <ConfirmModal
+          isOpen={!!studentToDelete}
+          title="Delete Student Record"
+          message={
+            <span>
+              Are you sure you want to permanently delete student <strong>{studentToDelete?.name}</strong> ({studentToDelete?.admissionNumber})? This action cannot be undone.
+            </span>
+          }
+          confirmText="Delete Student"
+          isDanger={true}
+          onConfirm={handleConfirmDeleteStudent}
+          onClose={() => setStudentToDelete(null)}
+        />
       </div>
     </AppShell>
   );

@@ -111,9 +111,7 @@ function LoginFormContent() {
       if (!result.success) {
         setError(result.error || 'Authentication failed. Please check your credentials.');
       } else {
-        if (result.mustChangePassword) {
-          router.push('/change-password');
-        } else if (result.role === 'SUPER_ADMIN') {
+        if (result.role === 'SUPER_ADMIN') {
           router.push('/super-admin');
         } else {
           router.push('/center-admin');
@@ -406,9 +404,6 @@ function LoginFormContent() {
                     onChange={setPassword}
                     autoFocus={false}
                   />
-                  <p className="text-[10px] text-slate-400 mt-1.5">
-                    Default PIN is the last 4 digits of your phone number ({phone.replace(/\D/g, '').slice(-4) || '••••'}).
-                  </p>
                 </div>
               )}
 

@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { dataService } from '@/lib/dataService';
 import { Student, StudentStatus } from '@/types';
 import { formatCurrency, normalizePhoneNumber } from '@/lib/constants';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import {
   Users,
   Plus,
@@ -22,6 +23,7 @@ import {
   IndianRupee,
   CalendarCheck,
   Award,
+  Trash2,
 } from 'lucide-react';
 
 export default function CenterAdminStudentsPage() {
@@ -33,6 +35,8 @@ export default function CenterAdminStudentsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [viewingStudent, setViewingStudent] = useState<Student | null>(null);
+  const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
+  const [studentToToggleStatus, setStudentToToggleStatus] = useState<Student | null>(null);
 
   // Form State
   const [name, setName] = useState('');
@@ -112,9 +116,18 @@ export default function CenterAdminStudentsPage() {
     refreshData();
   };
 
-  const handleToggleStatus = (student: Student) => {
-    const nextStatus: StudentStatus = student.status === 'Active' ? 'Inactive' : 'Active';
-    dataService.setStudentStatus(student.id, nextStatus);
+  const handleConfirmDeleteStudent = () => {
+    if (!studentToDelete) return;
+    dataService.deleteStudent(studentToDelete.id, 'Centre Admin');
+    setStudentToDelete(null);
+    refreshData();
+  };
+
+  const handleConfirmToggleStatus = () => {
+    if (!studentToToggleStatus) return;
+    const nextStatus: StudentStatus = studentToToggleStatus.status === 'Active' ? 'Inactive' : 'Active';
+    dataService.setStudentStatus(studentToToggleStatus.id, nextStatus);
+    setStudentToToggleStatus(null);
     refreshData();
   };
 
@@ -248,15 +261,24 @@ export default function CenterAdminStudentsPage() {
 
                         <button
                           type="button"
-                          onClick={() => handleToggleStatus(s)}
+                          onClick={() => setStudentToToggleStatus(s)}
                           className={`p-1.5 rounded-lg transition-colors ${
                             s.status === 'Active'
-                              ? 'text-slate-400 hover:text-red-600 hover:bg-red-50'
+                              ? 'text-slate-400 hover:text-amber-600 hover:bg-amber-50'
                               : 'text-cre-green hover:bg-cre-green-light'
                           }`}
                           title={s.status === 'Active' ? 'Mark Inactive (Leaving)' : 'Restore Active'}
                         >
                           {s.status === 'Active' ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setStudentToDelete(s)}
+                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Delete Student Permanently"
+                        >
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </td>
@@ -596,6 +618,50 @@ export default function CenterAdminStudentsPage() {
             </div>
           </div>
         )}
+
+        {/* Confirm Delete Student Modal */}
+        <ConfirmModal
+          isOpen={!!studentToDelete}
+          title="Delete Student Record"
+          message={
+            <span>
+              Are you sure you want to permanently delete student{' '}
+              <strong>{studentToDelete?.name}</strong> (Admission No:{' '}
+              {studentToDelete?.admissionNumber})? All their enrolment data will be
+              permanently erased from the centre register.
+            </span>
+          }
+          confirmText="Delete Student"
+          isDanger={true}
+          onConfirm={handleConfirmDeleteStudent}
+          onClose={() => setStudentToDelete(null)}
+        />
+
+        {/* Confirm Toggle Status Modal */}
+        <ConfirmModal
+          isOpen={!!studentToToggleStatus}
+          title={
+            studentToToggleStatus?.status === 'Active'
+              ? 'Mark Student as Inactive'
+              : 'Reactivate Student'
+          }
+          message={
+            <span>
+              Are you sure you want to mark student{' '}
+              <strong>{studentToToggleStatus?.name}</strong> as{' '}
+              <strong>
+                {studentToToggleStatus?.status === 'Active' ? 'Inactive' : 'Active'}
+              </strong>
+              ?
+            </span>
+          }
+          confirmText={
+            studentToToggleStatus?.status === 'Active' ? 'Mark Inactive' : 'Activate'
+          }
+          isDanger={studentToToggleStatus?.status === 'Active'}
+          onConfirm={handleConfirmToggleStatus}
+          onClose={() => setStudentToToggleStatus(null)}
+        />
       </div>
     </AppShell>
   );
