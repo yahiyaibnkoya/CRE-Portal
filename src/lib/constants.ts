@@ -14,7 +14,7 @@ export const BRAND_COLORS = {
 };
 
 export const SUPER_ADMIN_DEFAULT_PHONE = '9644889944';
-export const SUPER_ADMIN_DEFAULT_PASSWORD = '96448899';
+export const SUPER_ADMIN_DEFAULT_PASSWORD = '9944'; // Last 4 digits of 9644889944
 export const SUPER_ADMIN_WHATSAPP_RESET = '9644889944';
 
 export const KERALA_DISTRICTS: string[] = [
@@ -76,11 +76,14 @@ export function normalizePhoneNumber(input: string): string {
 
 /**
  * Derives the initial default password for any admin:
- * The first 8 digits of their normalized phone number.
+ * The last 4 digits of their normalized phone number.
  */
 export function getDefaultPassword(phone: string): string {
   const norm = normalizePhoneNumber(phone);
-  return norm.substring(0, 8);
+  if (norm.length >= 4) {
+    return norm.slice(-4);
+  }
+  return norm.padStart(4, '0');
 }
 
 /**

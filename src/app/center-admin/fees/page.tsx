@@ -28,6 +28,7 @@ export default function CenterAdminFeesPage() {
   const [selectedMonth, setSelectedMonth] = useState('2026-11');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [localVersion, setLocalVersion] = useState(0);
 
   // Payment Recording Modal
   const [isPayModalOpen, setIsPayModalOpen] = useState(false);
@@ -47,15 +48,15 @@ export default function CenterAdminFeesPage() {
 
   const activeStudents = useMemo(() => {
     return dataService.getStudents(centerId).filter((s) => s.status === 'Active');
-  }, [centerId]);
+  }, [centerId, localVersion]);
 
   const monthlyFees = useMemo(() => {
     return dataService.getMonthlyFees(centerId, selectedMonth);
-  }, [centerId, selectedMonth]);
+  }, [centerId, selectedMonth, localVersion]);
 
   const feePayments = useMemo(() => {
     return dataService.getFeePayments(centerId, selectedMonth);
-  }, [centerId, selectedMonth]);
+  }, [centerId, selectedMonth, localVersion]);
 
   // Merge active students with their monthly fee records
   const studentFeeRows = useMemo(() => {
@@ -121,6 +122,7 @@ export default function CenterAdminFeesPage() {
       recordedBy: adminUser?.name || 'Centre Admin',
     });
 
+    setLocalVersion((v) => v + 1);
     setIsPayModalOpen(false);
     refreshData();
   };
@@ -145,6 +147,7 @@ export default function CenterAdminFeesPage() {
       remarks: adjustRemarks,
     });
 
+    setLocalVersion((v) => v + 1);
     setIsAdjustModalOpen(false);
     refreshData();
   };

@@ -4,7 +4,8 @@ import React, { useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { Lock, ShieldAlert, CheckCircle2, ArrowRight } from 'lucide-react';
+import { PinInput } from '@/components/ui/PinInput';
+import { ShieldAlert, CheckCircle2, ArrowRight } from 'lucide-react';
 
 export default function ChangePasswordPage() {
   const router = useRouter();
@@ -20,13 +21,13 @@ export default function ChangePasswordPage() {
     e.preventDefault();
     setError(null);
 
-    if (newPassword.length < 6) {
-      setError('Password must be at least 6 characters long.');
+    if (newPassword.length !== 4) {
+      setError('PIN must be exactly a 4-digit number.');
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      setError('Passwords do not match. Please re-enter.');
+      setError('PINs do not match. Please re-enter.');
       return;
     }
 
@@ -43,7 +44,7 @@ export default function ChangePasswordPage() {
           }
         }, 1200);
       } else {
-        setError(res.error || 'Failed to update password. Please try again.');
+        setError(res.error || 'Failed to update PIN. Please try again.');
       }
     } catch {
       setError('An unexpected error occurred.');
@@ -66,7 +67,7 @@ export default function ChangePasswordPage() {
           />
         </div>
         <h1 className="text-lg sm:text-xl font-black text-cre-navy uppercase tracking-wide">
-          Compulsory Password Change
+          Set 4-Digit Login PIN
         </h1>
         <p className="mt-1 text-xs text-slate-500">
           Wisdom Islamic Students Organization – CRE Management Portal
@@ -79,9 +80,9 @@ export default function ChangePasswordPage() {
           <div className="mb-6 bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start space-x-3 text-xs text-amber-800">
             <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
             <div>
-              <p className="font-bold text-amber-900">First-Time Login Security</p>
+              <p className="font-bold text-amber-900">Personalize Your PIN</p>
               <p className="mt-1 leading-relaxed">
-                You are currently using the default initial password. For the security of your CRE Centre data, you must establish a personalized, confidential password before accessing the dashboard.
+                For the security of your CRE Centre data, please set a confidential 4-digit PIN for your mobile number.
               </p>
             </div>
           </div>
@@ -95,47 +96,31 @@ export default function ChangePasswordPage() {
           {success ? (
             <div className="text-center py-6 space-y-3">
               <CheckCircle2 className="w-12 h-12 text-cre-green mx-auto animate-bounce" />
-              <h3 className="text-sm font-bold text-cre-navy">Password Updated Successfully!</h3>
+              <h3 className="text-sm font-bold text-cre-navy">PIN Updated Successfully!</h3>
               <p className="text-xs text-slate-500">Redirecting to your dashboard...</p>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  New Password
+                <label className="block text-xs font-bold text-slate-700 mb-2">
+                  New 4-Digit PIN
                 </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                    <Lock className="w-4 h-4" />
-                  </div>
-                  <input
-                    type="password"
-                    required
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Enter new strong password"
-                    className="block w-full pl-10 pr-4 py-2.5 text-xs font-medium border border-slate-200 rounded-xl focus:ring-2 focus:ring-cre-green focus:border-cre-green focus:outline-hidden bg-slate-50/50"
-                  />
-                </div>
+                <PinInput
+                  value={newPassword}
+                  onChange={setNewPassword}
+                  autoFocus={true}
+                />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Confirm New Password
+                <label className="block text-xs font-bold text-slate-700 mb-2">
+                  Confirm 4-Digit PIN
                 </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                    <Lock className="w-4 h-4" />
-                  </div>
-                  <input
-                    type="password"
-                    required
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Re-enter new password"
-                    className="block w-full pl-10 pr-4 py-2.5 text-xs font-medium border border-slate-200 rounded-xl focus:ring-2 focus:ring-cre-green focus:border-cre-green focus:outline-hidden bg-slate-50/50"
-                  />
-                </div>
+                <PinInput
+                  value={confirmPassword}
+                  onChange={setConfirmPassword}
+                  autoFocus={false}
+                />
               </div>
 
               <div className="pt-2">

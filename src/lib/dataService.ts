@@ -86,6 +86,7 @@ function getInitialSeedData() {
     name: 'Wisdom Super Admin',
     role: 'SUPER_ADMIN',
     centerIds: [],
+    passwordPin: SUPER_ADMIN_DEFAULT_PASSWORD, // '9944'
     mustChangePassword: true,
     isActive: true,
     createdAt: new Date().toISOString(),
@@ -233,7 +234,27 @@ class DataService {
       localStorage.setItem(getKey('demo_purged_v2'), 'true');
     }
 
-    // 2. Initial seed if storage is empty
+    // 2. Migration for 4-Digit Password PIN
+    const v3Done = localStorage.getItem(getKey('migration_v3_4digit_pin'));
+    if (!v3Done) {
+      const users = getLocal<AdminUser[]>('users', []);
+      users.forEach((u) => {
+        const norm = normalizePhoneNumber(u.phone);
+        const last4 = getDefaultPassword(norm);
+        if (!u.passwordPin || u.passwordPin.length !== 4) {
+          u.passwordPin = last4;
+        }
+        // Clear obsolete 8-digit custom password
+        const saved = getLocal<string | null>(`pwd_${norm}`, null);
+        if (saved && saved.length !== 4) {
+          localStorage.removeItem(getKey(`pwd_${norm}`));
+        }
+      });
+      setLocal('users', users);
+      localStorage.setItem(getKey('migration_v3_4digit_pin'), 'true');
+    }
+
+    // 3. Initial seed if storage is empty
     const existing = localStorage.getItem(getKey('users'));
     if (!existing) {
       const seed = getInitialSeedData();
@@ -254,11 +275,68 @@ class DataService {
 
     this.inited = true;
 
-    // 3. Background Cloud Sync with Firebase Firestore so added data persists across re-deployments
+    // 4. Background Cloud Sync with Firebase Firestore so added data persists across re-deployments
     if (!this.firestoreSynced && db && typeof window !== 'undefined') {
       this.firestoreSynced = true;
       this.syncWithFirestore();
     }
+  }
+
+  public async ensureSynced(): Promise<void> {
+    this.init();
+    await this.syncWithFirestore();
+  }
+
+  public async fetchUserFromFirestore(phone: string): Promise<AdminUser | null> {
+    if (!db || typeof window === 'undefined') return null;
+    try {
+      const norm = normalizePhoneNumber(phone);
+      const q = query(collection(db, 'users'), where('phone', '==', norm));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        const u = snap.docs[0].data() as AdminUser;
+        const users = this.getUsers();
+        const idx = users.findIndex(item => item.uid === u.uid || normalizePhoneNumber(item.phone) === norm);
+        if (idx >= 0) users[idx] = u;
+        else users.push(u);
+        setLocal('users', users);
+        return u;
+      }
+    } catch (err) {
+      console.warn('Error fetching user from Firestore:', err);
+    }
+    return null;
+  }
+
+  public async fetchStudentsFromFirestore(phone: string): Promise<Student[]> {
+    if (!db || typeof window === 'undefined') return [];
+    try {
+      const norm = normalizePhoneNumber(phone);
+      const snap = await getDocs(collection(db, 'students'));
+      const matching: Student[] = [];
+      snap.forEach((d) => {
+        const s = d.data() as Student;
+        const pPhone = normalizePhoneNumber(s.parentPhone || '');
+        const sPhone = normalizePhoneNumber(s.studentPhone || '');
+        if (pPhone === norm || sPhone === norm) {
+          matching.push(s);
+        }
+      });
+      if (matching.length > 0) {
+        const local = getLocal<Student[]>('students', []);
+        const merged = [...local];
+        matching.forEach((ms) => {
+          const idx = merged.findIndex((x) => x.id === ms.id);
+          if (idx >= 0) merged[idx] = ms;
+          else merged.push(ms);
+        });
+        setLocal('students', merged);
+      }
+      return matching;
+    } catch (err) {
+      console.warn('Error fetching students from Firestore:', err);
+    }
+    return [];
   }
 
   private async syncWithFirestore() {
@@ -389,14 +467,15 @@ class DataService {
     const user = users.find(u => normalizePhoneNumber(u.phone) === norm);
     if (!user) return false;
 
+    user.passwordPin = newPasswordPlain;
     user.mustChangePassword = false;
     user.updatedAt = new Date().toISOString();
     setLocal('users', users);
     this.syncDocToFirestore('users', user.uid, user);
 
-    // Save custom password hash / tracker locally (or Firebase Auth)
+    // Save custom password locally
     setLocal(`pwd_${norm}`, newPasswordPlain);
-    this.logAudit('Password Changed', `User ${user.phone} (${user.role}) changed their password`, user.name);
+    this.logAudit('Password Changed', `User ${user.phone} (${user.role}) changed their 4-digit PIN`, user.name);
     return true;
   }
 
@@ -406,13 +485,18 @@ class DataService {
     const user = this.getUserByPhone(norm);
     if (!user || !user.isActive) return false;
 
-    // Check if custom password has been set
+    // 1. Direct passwordPin property on user
+    if (user.passwordPin) {
+      return user.passwordPin === passwordInput;
+    }
+
+    // 2. Local custom PIN
     const savedCustom = getLocal<string | null>(`pwd_${norm}`, null);
     if (savedCustom) {
       return savedCustom === passwordInput;
     }
 
-    // Default password rule: first 8 digits of normalized phone
+    // 3. Default password rule: last 4 digits of normalized phone
     const defaultPwd = getDefaultPassword(norm);
     return passwordInput === defaultPwd;
   }
@@ -424,15 +508,16 @@ class DataService {
     const user = users.find(u => normalizePhoneNumber(u.phone) === norm);
     if (!user) return false;
 
+    const defaultPin = getDefaultPassword(norm);
+    user.passwordPin = defaultPin;
     user.mustChangePassword = true;
     user.updatedAt = new Date().toISOString();
     setLocal('users', users);
     this.syncDocToFirestore('users', user.uid, user);
-    // Remove custom password so it falls back to first 8 digits default password
     if (typeof window !== 'undefined') {
       localStorage.removeItem(getKey(`pwd_${norm}`));
     }
-    this.logAudit('Password Reset', `Password for ${user.phone} reset to default by ${performedBy}`, performedBy);
+    this.logAudit('Password Reset', `Password for ${user.phone} reset to default last 4 digits PIN by ${performedBy}`, performedBy);
     return true;
   }
 
@@ -513,6 +598,7 @@ class DataService {
       }
       admin.name = params.adminName || admin.name;
       if (params.adminPlace) admin.place = params.adminPlace;
+      if (params.adminPasswordPlain) admin.passwordPin = params.adminPasswordPlain;
       this.saveUser(admin);
     } else {
       admin = {
@@ -522,6 +608,7 @@ class DataService {
         place: params.adminPlace,
         role: 'CENTER_ADMIN',
         centerIds: [savedCenter.id],
+        passwordPin: params.adminPasswordPlain || getDefaultPassword(normPhone),
         mustChangePassword: false, // Explicitly set password initially
         isActive: true,
         createdAt: new Date().toISOString(),
@@ -577,6 +664,7 @@ class DataService {
         id: newId,
         name: centerData.name,
         place: centerData.place,
+        landmark: centerData.landmark || '',
         state: centerData.state || 'Kerala',
         district: centerData.district || 'Malappuram West',
         otherStateName: centerData.otherStateName,
@@ -692,6 +780,7 @@ class DataService {
         centerId: studentData.centerId,
         admissionNumber: studentData.admissionNumber || this.generateAdmissionNumber(studentData.centerId),
         name: studentData.name,
+        gender: studentData.gender || 'Boy',
         parentName: studentData.parentName || '',
         studentPhone: studentData.studentPhone ? normalizePhoneNumber(studentData.studentPhone) : '',
         parentPhone: studentData.parentPhone ? normalizePhoneNumber(studentData.parentPhone) : '',

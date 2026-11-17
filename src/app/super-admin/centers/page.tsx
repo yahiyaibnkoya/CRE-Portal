@@ -43,6 +43,7 @@ export default function SuperAdminCentersPage() {
   // Form State
   const [name, setName] = useState('');
   const [place, setPlace] = useState('');
+  const [landmark, setLandmark] = useState('');
   const [state, setState] = useState<'Kerala' | 'Other State'>('Kerala');
   const [district, setDistrict] = useState(KERALA_DISTRICTS[10] || 'Malappuram West');
   const [otherStateName, setOtherStateName] = useState('');
@@ -69,9 +70,10 @@ export default function SuperAdminCentersPage() {
       const q = searchTerm.toLowerCase();
       const matchName = c.name.toLowerCase().includes(q);
       const matchPlace = c.place.toLowerCase().includes(q);
+      const matchLandmark = (c.landmark || '').toLowerCase().includes(q);
       const matchDist = (c.district || '').toLowerCase().includes(q);
       const matchZone = (c.zoneName || '').toLowerCase().includes(q);
-      return matchName || matchPlace || matchDist || matchZone;
+      return matchName || matchPlace || matchLandmark || matchDist || matchZone;
     }
     return true;
   });
@@ -80,6 +82,7 @@ export default function SuperAdminCentersPage() {
     setEditingCenter(null);
     setName('');
     setPlace('');
+    setLandmark('');
     setState('Kerala');
     setDistrict(KERALA_DISTRICTS[10] || 'Malappuram West');
     setOtherStateName('');
@@ -103,6 +106,7 @@ export default function SuperAdminCentersPage() {
     setEditingCenter(center);
     setName(center.name);
     setPlace(center.place);
+    setLandmark(center.landmark || '');
     setState(center.state as 'Kerala' | 'Other State');
     setDistrict(center.district);
     setOtherStateName(center.otherStateName || '');
@@ -130,6 +134,7 @@ export default function SuperAdminCentersPage() {
       id: editingCenter?.id,
       name,
       place,
+      landmark: landmark.trim() || undefined,
       state,
       district: state === 'Kerala' ? district : otherDistrictName,
       otherStateName: state === 'Other State' ? otherStateName : undefined,
@@ -255,7 +260,7 @@ export default function SuperAdminCentersPage() {
                       <h3 className="text-sm font-bold text-cre-navy line-clamp-1">{c.name}</h3>
                       <div className="flex items-center text-xs text-slate-500 mt-1">
                         <MapPin className="w-3.5 h-3.5 mr-1 text-slate-400 shrink-0" />
-                        <span>{c.place}, {c.state === 'Kerala' ? c.district : c.otherStateName}</span>
+                        <span>{c.place}{c.landmark ? ` (${c.landmark})` : ''}, {c.state === 'Kerala' ? c.district : c.otherStateName}</span>
                       </div>
                     </div>
                     <span
@@ -386,7 +391,7 @@ export default function SuperAdminCentersPage() {
               </div>
 
               <form onSubmit={handleSaveCenter} className="mt-5 space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
                       Centre Name *
@@ -403,7 +408,7 @@ export default function SuperAdminCentersPage() {
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Place *
+                      Place / City *
                     </label>
                     <input
                       type="text"
@@ -411,6 +416,19 @@ export default function SuperAdminCentersPage() {
                       value={place}
                       onChange={(e) => setPlace(e.target.value)}
                       placeholder="e.g. Manjeri"
+                      className="w-full px-3.5 py-2 text-xs border border-cre-border rounded-xl focus:ring-2 focus:ring-cre-green focus:outline-hidden"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Landmark (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={landmark}
+                      onChange={(e) => setLandmark(e.target.value)}
+                      placeholder="e.g. Near Salafi Masjid"
                       className="w-full px-3.5 py-2 text-xs border border-cre-border rounded-xl focus:ring-2 focus:ring-cre-green focus:outline-hidden"
                     />
                   </div>

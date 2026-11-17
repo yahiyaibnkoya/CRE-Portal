@@ -36,6 +36,7 @@ export default function CenterAdminStudentsPage() {
 
   // Form State
   const [name, setName] = useState('');
+  const [gender, setGender] = useState<'Boy' | 'Girl'>('Boy');
   const [parentName, setParentName] = useState('');
   const [parentPhone, setParentPhone] = useState('');
   const [studentPhone, setStudentPhone] = useState('');
@@ -64,6 +65,7 @@ export default function CenterAdminStudentsPage() {
   const handleOpenAdd = () => {
     setEditingStudent(null);
     setName('');
+    setGender('Boy');
     setParentName('');
     setParentPhone('');
     setStudentPhone('');
@@ -77,6 +79,7 @@ export default function CenterAdminStudentsPage() {
   const handleOpenEdit = (student: Student) => {
     setEditingStudent(student);
     setName(student.name);
+    setGender(student.gender || 'Boy');
     setParentName(student.parentName);
     setParentPhone(student.parentPhone || '');
     setStudentPhone(student.studentPhone || '');
@@ -95,6 +98,7 @@ export default function CenterAdminStudentsPage() {
       id: editingStudent?.id,
       centerId,
       name,
+      gender,
       parentName,
       parentPhone: parentPhone ? normalizePhoneNumber(parentPhone) : '',
       studentPhone: studentPhone ? normalizePhoneNumber(studentPhone) : '',
@@ -173,6 +177,7 @@ export default function CenterAdminStudentsPage() {
                 <tr>
                   <th className="py-3.5 px-4">Adm No</th>
                   <th className="py-3.5 px-4">Student Name</th>
+                  <th className="py-3.5 px-4">Gender</th>
                   <th className="py-3.5 px-4">Parent / Guardian</th>
                   <th className="py-3.5 px-4">Parent Phone</th>
                   <th className="py-3.5 px-4">Place</th>
@@ -190,6 +195,17 @@ export default function CenterAdminStudentsPage() {
                     <td className="py-3.5 px-4">
                       <span className="font-bold text-slate-900 block">{s.name}</span>
                       <span className="text-[10px] text-slate-400">Admitted: {s.admissionDate}</span>
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <span
+                        className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                          s.gender === 'Girl'
+                            ? 'bg-pink-50 text-pink-700 border border-pink-200'
+                            : 'bg-blue-50 text-blue-700 border border-blue-200'
+                        }`}
+                      >
+                        {s.gender || 'Boy'}
+                      </span>
                     </td>
                     <td className="py-3.5 px-4 text-slate-700 font-medium">{s.parentName}</td>
                     <td className="py-3.5 px-4 font-mono text-slate-700">
@@ -282,7 +298,7 @@ export default function CenterAdminStudentsPage() {
               </div>
 
               <form onSubmit={handleSaveStudent} className="mt-4 space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
                       Student Full Name *
@@ -295,6 +311,36 @@ export default function CenterAdminStudentsPage() {
                       placeholder="e.g. Muhammed Rayan"
                       className="w-full px-3.5 py-2 text-xs border border-cre-border rounded-xl focus:ring-2 focus:ring-cre-green focus:outline-hidden font-medium"
                     />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Gender *
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setGender('Boy')}
+                        className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all ${
+                          gender === 'Boy'
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                            : 'bg-white text-slate-700 border-cre-border hover:bg-slate-50'
+                        }`}
+                      >
+                        Boy
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setGender('Girl')}
+                        className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all ${
+                          gender === 'Girl'
+                            ? 'bg-pink-600 text-white border-pink-600 shadow-xs'
+                            : 'bg-white text-slate-700 border-cre-border hover:bg-slate-50'
+                        }`}
+                      >
+                        Girl
+                      </button>
+                    </div>
                   </div>
 
                   <div>
@@ -432,7 +478,12 @@ export default function CenterAdminStudentsPage() {
                     {viewingStudent.name.charAt(0)}
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-cre-navy">{viewingStudent.name}</h3>
+                    <div className="flex items-center space-x-2">
+                      <h3 className="text-sm font-bold text-cre-navy">{viewingStudent.name}</h3>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${viewingStudent.gender === 'Girl' ? 'bg-pink-100 text-pink-700' : 'bg-blue-100 text-blue-700'}`}>
+                        {viewingStudent.gender || 'Boy'}
+                      </span>
+                    </div>
                     <p className="text-[11px] text-slate-500">
                       Admission No: <span className="font-mono font-bold text-cre-navy">{viewingStudent.admissionNumber}</span>
                     </p>

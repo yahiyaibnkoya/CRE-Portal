@@ -9,7 +9,6 @@ import {
   Settings,
   Building,
   KeyRound,
-  Download,
   IndianRupee,
   GraduationCap,
   Calendar,
@@ -39,40 +38,17 @@ export default function CenterAdminSettingsPage() {
     refreshData();
   };
 
-  const handleExportCenterData = () => {
-    if (!centerId) return;
-    const dump = dataService.exportData(centerId);
-    const blob = new Blob([JSON.stringify(dump, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `cre_center_${activeCenter?.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_backup.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
   return (
     <AppShell>
       <div className="space-y-6 max-w-4xl">
         {/* Header */}
-        <div className="pb-2 border-b border-cre-border flex items-center justify-between">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-black text-cre-navy">
-              Centre Settings & Policies
-            </h1>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Default monthly tuition fees, examination structure, and institutional data export
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleExportCenterData}
-            className="inline-flex items-center px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-cre-navy hover:bg-cre-navy-hover transition-all shadow-md shadow-cre-navy/20"
-          >
-            <Download className="w-4 h-4 mr-1.5" />
-            Export Centre Data (JSON)
-          </button>
+        <div className="pb-2 border-b border-cre-border">
+          <h1 className="text-xl sm:text-2xl font-black text-cre-navy">
+            Centre Settings & Policies
+          </h1>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Default monthly tuition fees and examination structure
+          </p>
         </div>
 
         {success && (

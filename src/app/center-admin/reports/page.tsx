@@ -43,6 +43,7 @@ function CenterReportsContent() {
   // Column Visibility Filters (Add/Remove content)
   const [showAdmNo, setShowAdmNo] = useState(true);
   const [showName, setShowName] = useState(true);
+  const [showGender, setShowGender] = useState(true);
   const [showPlace, setShowPlace] = useState(true);
   const [showContact, setShowContact] = useState(true);
   const [showDetails, setShowDetails] = useState(true);
@@ -150,8 +151,9 @@ function CenterReportsContent() {
       } else {
         presentList.forEach((item, idx) => {
           const admStr = showAdmNo && item.student?.admissionNumber ? ` (${item.student.admissionNumber})` : '';
+          const genderStr = showGender && item.student?.gender ? ` [${item.student.gender}]` : '';
           const placeStr = showPlace && item.student?.place ? ` - ${item.student.place}` : '';
-          text += `\n${idx + 1}. ${item.student?.name || 'Student'}${admStr}${placeStr}`;
+          text += `\n${idx + 1}. ${item.student?.name || 'Student'}${genderStr}${admStr}${placeStr}`;
         });
       }
 
@@ -161,9 +163,10 @@ function CenterReportsContent() {
       } else {
         absentList.forEach((item, idx) => {
           const admStr = showAdmNo && item.student?.admissionNumber ? ` (${item.student.admissionNumber})` : '';
+          const genderStr = showGender && item.student?.gender ? ` [${item.student.gender}]` : '';
           const phone = item.student?.parentPhone || item.student?.studentPhone || '';
           const phoneStr = showContact && phone ? ` - Parent: ${phone}` : '';
-          text += `\n${idx + 1}. ${item.student?.name || 'Student'}${admStr}${phoneStr}`;
+          text += `\n${idx + 1}. ${item.student?.name || 'Student'}${genderStr}${admStr}${phoneStr}`;
         });
       }
 
@@ -171,11 +174,11 @@ function CenterReportsContent() {
         text += `\n\n*ON LEAVE (${leaveList.length}):*`;
         leaveList.forEach((item, idx) => {
           const admStr = showAdmNo && item.student?.admissionNumber ? ` (${item.student.admissionNumber})` : '';
-          text += `\n${idx + 1}. ${item.student?.name || 'Student'}${admStr} - ${item.record.remarks || 'Sanctioned leave'}`;
+          const genderStr = showGender && item.student?.gender ? ` [${item.student.gender}]` : '';
+          text += `\n${idx + 1}. ${item.student?.name || 'Student'}${genderStr}${admStr} - ${item.record.remarks || 'Sanctioned leave'}`;
         });
       }
 
-      text += `\n\n*Generated on:* ${new Date().toLocaleDateString('en-IN')}`;
       return text;
     }
 
@@ -187,19 +190,19 @@ function CenterReportsContent() {
       const collectedTotal = monthlyFees.reduce((acc, f) => acc + (f.paidAmount || 0), 0);
       const outstandingTotal = monthlyFees.reduce((acc, f) => acc + (f.outstandingAmount || 0), 0);
 
-      return `*CRE – MONTHLY FEE REPORT*\n*Wisdom Islamic Students Organization*\n\n*Centre:* ${centerName}\n*Month:* ${selectedMonth}\n\n*FEE SUMMARY*\nTotal Students: ${monthlyFees.length}\nPaid: ${paidCount}\nPartially Paid: ${partialCount}\nUnpaid: ${unpaidCount}\n\n*COLLECTION*\nExpected Amount: ${formatCurrency(expectedTotal)}\nCollected Amount: ${formatCurrency(collectedTotal)}\nOutstanding: ${formatCurrency(outstandingTotal)}\n\n*Generated on:* ${new Date().toLocaleDateString('en-IN')}`;
+      return `*CRE – MONTHLY FEE REPORT*\n*Wisdom Islamic Students Organization*\n\n*Centre:* ${centerName}\n*Month:* ${selectedMonth}\n\n*FEE SUMMARY*\nTotal Students: ${monthlyFees.length}\nPaid: ${paidCount}\nPartially Paid: ${partialCount}\nUnpaid: ${unpaidCount}\n\n*COLLECTION*\nExpected Amount: ${formatCurrency(expectedTotal)}\nCollected Amount: ${formatCurrency(collectedTotal)}\nOutstanding: ${formatCurrency(outstandingTotal)}`;
     }
 
     if (reportType === 'attendance') {
-      return `*CRE – MONTHLY ATTENDANCE STATEMENT*\n*Wisdom Islamic Students Organization*\n\n*Centre:* ${centerName}\n*Month:* ${selectedMonth}\n\n*ATTENDANCE SUMMARY*\nTotal Conducted Classes: ${attendanceSummary.totalConductedMax}\nPresent Sessions: ${attendanceSummary.totalPresent}\nAbsent Sessions: ${attendanceSummary.totalAbsent}\nLeave Records: ${attendanceSummary.totalLeave}\nOverall Attendance: ${attendanceSummary.overallRate}%\n\n*Generated on:* ${new Date().toLocaleDateString('en-IN')}`;
+      return `*CRE – MONTHLY ATTENDANCE STATEMENT*\n*Wisdom Islamic Students Organization*\n\n*Centre:* ${centerName}\n*Month:* ${selectedMonth}\n\n*ATTENDANCE SUMMARY*\nTotal Conducted Classes: ${attendanceSummary.totalConductedMax}\nPresent Sessions: ${attendanceSummary.totalPresent}\nAbsent Sessions: ${attendanceSummary.totalAbsent}\nLeave Records: ${attendanceSummary.totalLeave}\nOverall Attendance: ${attendanceSummary.overallRate}%`;
     }
 
     if (reportType === 'financial') {
-      return `*CRE – FINANCIAL REPORT*\n*Wisdom Islamic Students Organization*\n\n*Centre:* ${centerName}\n*Month:* ${selectedMonth}\n\n*INCOME*\nFee Income: ${formatCurrency(financialSummary.totalFeeIncome)}\nDonations: ${formatCurrency(financialSummary.totalDonationIncome)}\n*Total Income:* ${formatCurrency(financialSummary.totalIncome)}\n\n*EXPENDITURE*\nWeekly Class Expenses: ${formatCurrency(financialSummary.totalWeeklyExpense)}\nOther Operational: ${formatCurrency(financialSummary.totalOtherExpense)}\n*Total Expenses:* ${formatCurrency(financialSummary.totalExpenses)}\n\n*NET BALANCE:* ${formatCurrency(financialSummary.netBalance)}\n\n*Generated on:* ${new Date().toLocaleDateString('en-IN')}`;
+      return `*CRE – FINANCIAL REPORT*\n*Wisdom Islamic Students Organization*\n\n*Centre:* ${centerName}\n*Month:* ${selectedMonth}\n\n*INCOME*\nFee Income: ${formatCurrency(financialSummary.totalFeeIncome)}\nDonations: ${formatCurrency(financialSummary.totalDonationIncome)}\n*Total Income:* ${formatCurrency(financialSummary.totalIncome)}\n\n*EXPENDITURE*\nWeekly Class Expenses: ${formatCurrency(financialSummary.totalWeeklyExpense)}\nOther Operational: ${formatCurrency(financialSummary.totalOtherExpense)}\n*Total Expenses:* ${formatCurrency(financialSummary.totalExpenses)}\n\n*NET BALANCE:* ${formatCurrency(financialSummary.netBalance)}`;
     }
 
     // Exam Report
-    return `*CRE – EXAMINATION REPORT*\n*Wisdom Islamic Students Organization*\n\n*Centre:* ${centerName}\n*Total Exams Recorded:* ${exams.length}\n*Evaluated Marks:* ${examMarks.length}\n\n*Generated on:* ${new Date().toLocaleDateString('en-IN')}`;
+    return `*CRE – EXAMINATION REPORT*\n*Wisdom Islamic Students Organization*\n\n*Centre:* ${centerName}\n*Total Exams Recorded:* ${exams.length}\n*Evaluated Marks:* ${examMarks.length}`;
   }, [
     reportType,
     centerName,
@@ -213,6 +216,7 @@ function CenterReportsContent() {
     examMarks,
     showAdmNo,
     showName,
+    showGender,
     showPlace,
     showContact,
   ]);
@@ -236,6 +240,7 @@ function CenterReportsContent() {
       const columns = ['#'];
       if (showAdmNo) columns.push('Adm No');
       if (showName) columns.push('Student Name');
+      if (showGender) columns.push('Gender');
       if (showPlace) columns.push('Place');
       if (showContact) columns.push('Parent Phone');
       if (showStatus) columns.push('Status');
@@ -247,6 +252,7 @@ function CenterReportsContent() {
         const row: (string | number)[] = [counter++];
         if (showAdmNo) row.push(item.student?.admissionNumber || '—');
         if (showName) row.push(item.student?.name || 'Student');
+        if (showGender) row.push(item.student?.gender || 'Boy');
         if (showPlace) row.push(item.student?.place || '—');
         if (showContact) row.push(item.student?.parentPhone || '—');
         if (showStatus) row.push('ABSENT');
@@ -257,6 +263,7 @@ function CenterReportsContent() {
         const row: (string | number)[] = [counter++];
         if (showAdmNo) row.push(item.student?.admissionNumber || '—');
         if (showName) row.push(item.student?.name || 'Student');
+        if (showGender) row.push(item.student?.gender || 'Boy');
         if (showPlace) row.push(item.student?.place || '—');
         if (showContact) row.push(item.student?.parentPhone || '—');
         if (showStatus) row.push('PRESENT');
@@ -267,6 +274,7 @@ function CenterReportsContent() {
         const row: (string | number)[] = [counter++];
         if (showAdmNo) row.push(item.student?.admissionNumber || '—');
         if (showName) row.push(item.student?.name || 'Student');
+        if (showGender) row.push(item.student?.gender || 'Boy');
         if (showPlace) row.push(item.student?.place || '—');
         if (showContact) row.push(item.student?.parentPhone || '—');
         if (showStatus) row.push('LEAVE');
@@ -291,6 +299,7 @@ function CenterReportsContent() {
       const columns = ['#'];
       if (showAdmNo) columns.push('Adm No');
       if (showName) columns.push('Student Name');
+      if (showGender) columns.push('Gender');
       if (showPlace) columns.push('Place');
       if (showDetails) {
         columns.push('Expected Fee');
@@ -305,6 +314,7 @@ function CenterReportsContent() {
         const row: (string | number)[] = [counter++];
         if (showAdmNo) row.push(st?.admissionNumber || '—');
         if (showName) row.push(st?.name || 'Student');
+        if (showGender) row.push(st?.gender || 'Boy');
         if (showPlace) row.push(st?.place || '—');
         if (showDetails) {
           row.push(formatCurrency(f.expectedFee));
@@ -331,6 +341,7 @@ function CenterReportsContent() {
       const columns = ['#'];
       if (showAdmNo) columns.push('Adm No');
       if (showName) columns.push('Student Name');
+      if (showGender) columns.push('Gender');
       if (showPlace) columns.push('Place');
       if (showDetails) {
         columns.push('Conducted');
@@ -346,6 +357,7 @@ function CenterReportsContent() {
         const row: (string | number)[] = [counter++];
         if (showAdmNo) row.push(s.admissionNumber);
         if (showName) row.push(s.name);
+        if (showGender) row.push(s.gender || 'Boy');
         if (showPlace) row.push(s.place || '—');
         if (showDetails) {
           row.push(att.totalConducted);
@@ -628,6 +640,19 @@ function CenterReportsContent() {
 
               <button
                 type="button"
+                onClick={() => setShowGender(!showGender)}
+                className={`inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  showGender
+                    ? 'bg-cre-green text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-400 line-through hover:bg-slate-200'
+                }`}
+              >
+                {showGender ? <CheckCircle className="w-3.5 h-3.5 mr-1.5" /> : <X className="w-3.5 h-3.5 mr-1.5" />}
+                Gender (Boy / Girl)
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setShowPlace(!showPlace)}
                 className={`inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                   showPlace
@@ -723,6 +748,7 @@ function CenterReportsContent() {
                       <th className="py-3 px-4">#</th>
                       {showAdmNo && <th className="py-3 px-4">Adm No</th>}
                       {showName && <th className="py-3 px-4">Student Name</th>}
+                      {showGender && <th className="py-3 px-4">Gender</th>}
                       {showPlace && <th className="py-3 px-4">Place</th>}
                       {showContact && <th className="py-3 px-4">Parent Phone</th>}
                       {showStatus && <th className="py-3 px-4 text-right">Attendance Status</th>}
@@ -741,6 +767,15 @@ function CenterReportsContent() {
                           )}
                           {showName && (
                             <td className="py-3 px-4 font-bold text-slate-900">{st?.name || 'Student'}</td>
+                          )}
+                          {showGender && (
+                            <td className="py-3 px-4">
+                              <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                (st?.gender || 'Boy') === 'Boy' ? 'bg-blue-50 text-blue-700' : 'bg-pink-50 text-pink-700'
+                              }`}>
+                                {st?.gender || 'Boy'}
+                              </span>
+                            </td>
                           )}
                           {showPlace && (
                             <td className="py-3 px-4 text-slate-600">{st?.place || '—'}</td>
@@ -810,6 +845,7 @@ function CenterReportsContent() {
                       <th className="py-3 px-4">#</th>
                       {showAdmNo && <th className="py-3 px-4">Adm No</th>}
                       {showName && <th className="py-3 px-4">Student Name</th>}
+                      {showGender && <th className="py-3 px-4">Gender</th>}
                       {showPlace && <th className="py-3 px-4">Place</th>}
                       {showDetails && (
                         <>
@@ -833,6 +869,15 @@ function CenterReportsContent() {
                           )}
                           {showName && (
                             <td className="py-3 px-4 font-bold text-slate-900">{s.name}</td>
+                          )}
+                          {showGender && (
+                            <td className="py-3 px-4">
+                              <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                (s.gender || 'Boy') === 'Boy' ? 'bg-blue-50 text-blue-700' : 'bg-pink-50 text-pink-700'
+                              }`}>
+                                {s.gender || 'Boy'}
+                              </span>
+                            </td>
                           )}
                           {showPlace && (
                             <td className="py-3 px-4 text-slate-600">{s.place || '—'}</td>
@@ -911,6 +956,7 @@ function CenterReportsContent() {
                       <th className="py-3 px-4">#</th>
                       {showAdmNo && <th className="py-3 px-4">Adm No</th>}
                       {showName && <th className="py-3 px-4">Student Name</th>}
+                      {showGender && <th className="py-3 px-4">Gender</th>}
                       {showPlace && <th className="py-3 px-4">Place</th>}
                       {showDetails && (
                         <>
@@ -933,6 +979,15 @@ function CenterReportsContent() {
                           )}
                           {showName && (
                             <td className="py-3 px-4 font-bold text-slate-900">{st?.name || 'Student'}</td>
+                          )}
+                          {showGender && (
+                            <td className="py-3 px-4">
+                              <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                (st?.gender || 'Boy') === 'Boy' ? 'bg-blue-50 text-blue-700' : 'bg-pink-50 text-pink-700'
+                              }`}>
+                                {st?.gender || 'Boy'}
+                              </span>
+                            </td>
                           )}
                           {showPlace && (
                             <td className="py-3 px-4 text-slate-600">{st?.place || '—'}</td>
@@ -1087,6 +1142,7 @@ function CenterReportsContent() {
                       <th className="py-3 px-4">#</th>
                       {showAdmNo && <th className="py-3 px-4">Adm No</th>}
                       {showName && <th className="py-3 px-4">Student Name</th>}
+                      {showGender && <th className="py-3 px-4">Gender</th>}
                       {showPlace && <th className="py-3 px-4">Place</th>}
                       {showDetails && (
                         <>
@@ -1110,6 +1166,15 @@ function CenterReportsContent() {
                           )}
                           {showName && (
                             <td className="py-3 px-4 font-bold text-slate-900">{st?.name || 'Student'}</td>
+                          )}
+                          {showGender && (
+                            <td className="py-3 px-4">
+                              <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                (st?.gender || 'Boy') === 'Boy' ? 'bg-blue-50 text-blue-700' : 'bg-pink-50 text-pink-700'
+                              }`}>
+                                {st?.gender || 'Boy'}
+                              </span>
+                            </td>
                           )}
                           {showPlace && (
                             <td className="py-3 px-4 text-slate-600">{st?.place || '—'}</td>

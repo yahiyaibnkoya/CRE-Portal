@@ -33,6 +33,7 @@ export default function CenterInfoPage() {
   // Centre Form state
   const [name, setName] = useState('');
   const [place, setPlace] = useState('');
+  const [landmark, setLandmark] = useState('');
   const [state, setState] = useState<'Kerala' | 'Other State'>('Kerala');
   const [district, setDistrict] = useState(KERALA_DISTRICTS[10]);
   const [otherStateName, setOtherStateName] = useState('');
@@ -61,6 +62,7 @@ export default function CenterInfoPage() {
     if (activeCenter) {
       setName(activeCenter.name);
       setPlace(activeCenter.place);
+      setLandmark(activeCenter.landmark || '');
       setState(activeCenter.state as 'Kerala' | 'Other State');
       setDistrict(activeCenter.district);
       setOtherStateName(activeCenter.otherStateName || '');
@@ -106,6 +108,7 @@ export default function CenterInfoPage() {
       id: activeCenter.id,
       name,
       place,
+      landmark: landmark.trim() || undefined,
       state,
       district: state === 'Kerala' ? district : otherDistrictName,
       otherStateName: state === 'Other State' ? otherStateName : undefined,
@@ -272,7 +275,7 @@ export default function CenterInfoPage() {
           </div>
 
           {/* Basic Details */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
                 Centre Name *
@@ -295,6 +298,19 @@ export default function CenterInfoPage() {
                 required
                 value={place}
                 onChange={(e) => setPlace(e.target.value)}
+                className="w-full px-3.5 py-2 text-xs border border-cre-border rounded-xl focus:ring-2 focus:ring-cre-green outline-hidden"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Landmark (Optional)
+              </label>
+              <input
+                type="text"
+                value={landmark}
+                onChange={(e) => setLandmark(e.target.value)}
+                placeholder="e.g. Near Salafi Masjid"
                 className="w-full px-3.5 py-2 text-xs border border-cre-border rounded-xl focus:ring-2 focus:ring-cre-green outline-hidden"
               />
             </div>

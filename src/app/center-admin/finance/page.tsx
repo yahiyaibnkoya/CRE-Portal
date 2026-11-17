@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { dataService } from '@/lib/dataService';
 import { Expense, Donation } from '@/types';
 import { formatCurrency, DEFAULT_WEEKLY_EXPENSE_CATEGORIES } from '@/lib/constants';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import {
   Wallet,
   Receipt,
@@ -26,10 +27,12 @@ export default function CenterAdminFinancePage() {
   const centerId = activeCenter?.id || '';
 
   const [selectedMonth, setSelectedMonth] = useState('2026-11');
+  const [localVersion, setLocalVersion] = useState(0);
 
   // Modal States
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [isDonationModalOpen, setIsDonationModalOpen] = useState(false);
+  const [deleteExpenseId, setDeleteExpenseId] = useState<string | null>(null);
 
   // Expense Form State
   const [expenseType, setExpenseType] = useState<'weekly' | 'other'>('weekly');
@@ -49,19 +52,19 @@ export default function CenterAdminFinancePage() {
 
   const summary = useMemo(() => {
     return dataService.getFinancialSummary(centerId, selectedMonth);
-  }, [centerId, selectedMonth]);
+  }, [centerId, selectedMonth, localVersion]);
 
   const feePayments = useMemo(() => {
     return dataService.getFeePayments(centerId, selectedMonth);
-  }, [centerId, selectedMonth]);
+  }, [centerId, selectedMonth, localVersion]);
 
   const donations = useMemo(() => {
     return dataService.getDonations(centerId, selectedMonth);
-  }, [centerId, selectedMonth]);
+  }, [centerId, selectedMonth, localVersion]);
 
   const expenses = useMemo(() => {
     return dataService.getExpenses(centerId, selectedMonth);
-  }, [centerId, selectedMonth]);
+  }, [centerId, selectedMonth, localVersion]);
 
   const weeklyExpenses = useMemo(() => {
     return expenses.filter((e) => e.type === 'weekly');
@@ -101,15 +104,21 @@ export default function CenterAdminFinancePage() {
       recordedBy: adminUser?.name || 'Centre Admin',
     });
 
+    setLocalVersion((v) => v + 1);
     setIsExpenseModalOpen(false);
     refreshData();
   };
 
   const handleDeleteExpense = (id: string) => {
-    if (confirm('Are you sure you want to delete this expense record?')) {
-      dataService.deleteExpense(id, adminUser?.name || 'Centre Admin');
-      refreshData();
-    }
+    setDeleteExpenseId(id);
+  };
+
+  const handleConfirmDeleteExpense = () => {
+    if (!deleteExpenseId) return;
+    dataService.deleteExpense(deleteExpenseId, adminUser?.name || 'Centre Admin');
+    setLocalVersion((v) => v + 1);
+    setDeleteExpenseId(null);
+    refreshData();
   };
 
   const handleSaveDonation = (e: React.FormEvent) => {
@@ -125,6 +134,7 @@ export default function CenterAdminFinancePage() {
       recordedBy: adminUser?.name || 'Centre Admin',
     });
 
+    setLocalVersion((v) => v + 1);
     setIsDonationModalOpen(false);
     refreshData();
   };
@@ -579,6 +589,17 @@ export default function CenterAdminFinancePage() {
             </div>
           </div>
         )}
+
+        {/* Confirm Delete Expense Modal */}
+        <ConfirmModal
+          isOpen={!!deleteExpenseId}
+          title="Delete Expense Record"
+          message="Are you sure you want to delete this expense record? This action will permanently remove it from the centre financial ledger."
+          confirmText="Delete Expense"
+          isDanger={true}
+          onConfirm={handleConfirmDeleteExpense}
+          onCancel={() => setDeleteExpenseId(null)}
+        />
       </div>
     </AppShell>
   );

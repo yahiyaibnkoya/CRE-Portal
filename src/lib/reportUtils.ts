@@ -143,7 +143,7 @@ export async function generatePdfReport(params: {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   doc.setTextColor(100, 116, 139);
-  doc.text(`Centre: ${params.centerName}   |   Period: ${params.period}   |   Generated: ${today}`, 14, currentY);
+  doc.text(`Centre: ${params.centerName}   |   Period: ${params.period}`, 14, currentY);
 
   currentY += 6;
 

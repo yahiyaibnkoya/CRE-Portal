@@ -27,6 +27,7 @@ import {
   MapPin,
   CheckCircle2,
 } from 'lucide-react';
+import { PinInput } from '@/components/ui/PinInput';
 
 function LoginFormContent() {
   const router = useRouter();
@@ -51,6 +52,7 @@ function LoginFormContent() {
   const [isAddCenterModalOpen, setIsAddCenterModalOpen] = useState(false);
   const [centerName, setCenterName] = useState('');
   const [centerPlace, setCenterPlace] = useState('');
+  const [centerLandmark, setCenterLandmark] = useState('');
   const [centerState, setCenterState] = useState<'Kerala' | 'Other State'>('Kerala');
   const [district, setDistrict] = useState(KERALA_DISTRICTS[10] || 'Malappuram West');
   const [zoneOrUnit, setZoneOrUnit] = useState<'Zone' | 'Unit'>('Zone');
@@ -65,6 +67,14 @@ function LoginFormContent() {
   const [newAdminPassword, setNewAdminPassword] = useState('');
   const [centerModalError, setCenterModalError] = useState<string | null>(null);
   const [centerModalSuccess, setCenterModalSuccess] = useState<string | null>(null);
+
+  const handleNewPhoneChange = (val: string) => {
+    setNewAdminPhone(val);
+    const clean = val.replace(/\D/g, '');
+    if (clean.length >= 4 && !newAdminPassword) {
+      setNewAdminPassword(clean.slice(-4));
+    }
+  };
 
   const { loginAdmin, loginStudentPhone, selectStudentSession, role } = useAuth();
 
@@ -90,8 +100,8 @@ function LoginFormContent() {
       setError('Please enter a valid 10-digit mobile phone number.');
       return;
     }
-    if (!password) {
-      setError('Please enter your password.');
+    if (!password || password.length !== 4) {
+      setError('Please enter your 4-digit PIN.');
       return;
     }
 
@@ -163,12 +173,14 @@ function LoginFormContent() {
     e.preventDefault();
     setCenterModalError(null);
 
-    if (!newAdminPhone || newAdminPhone.trim().length < 10) {
+    const cleanNewPhone = newAdminPhone.replace(/\D/g, '');
+    if (cleanNewPhone.length < 10) {
       setCenterModalError('Please enter a valid 10-digit mobile number for the Centre Admin.');
       return;
     }
-    if (!newAdminPassword || newAdminPassword.length < 6) {
-      setCenterModalError('Please set a secure initial password (at least 6 characters).');
+    const finalPin = newAdminPassword || cleanNewPhone.slice(-4);
+    if (!finalPin || finalPin.length !== 4) {
+      setCenterModalError('Login PIN must be exactly a 4-digit number (e.g. ' + cleanNewPhone.slice(-4) + ').');
       return;
     }
 
@@ -177,6 +189,7 @@ function LoginFormContent() {
         centerData: {
           name: centerName,
           place: centerPlace,
+          landmark: centerLandmark.trim() || undefined,
           state: centerState,
           district: centerState === 'Kerala' ? district : centerPlace,
           zoneOrUnit,
@@ -188,8 +201,8 @@ function LoginFormContent() {
           defaultFee: 100,
           status: 'Active',
         },
-        adminPhone: newAdminPhone,
-        adminPasswordPlain: newAdminPassword,
+        adminPhone: cleanNewPhone,
+        adminPasswordPlain: finalPin,
         adminName: newAdminName || 'Centre Admin',
         adminPlace: newAdminPlace || centerPlace,
       });
@@ -199,6 +212,7 @@ function LoginFormContent() {
       setPassword('');
       setCenterName('');
       setCenterPlace('');
+      setCenterLandmark('');
       setNewAdminName('');
       setNewAdminPhone('');
       setNewAdminPlace('');
@@ -377,29 +391,24 @@ function LoginFormContent() {
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <label className="block text-xs font-bold text-slate-700">
-                      Password
+                      4-Digit Login PIN
                     </label>
                     <button
                       type="button"
                       onClick={handleOpenForgotPassword}
                       className="text-[11px] font-semibold text-cre-navy hover:text-cre-green transition-colors"
                     >
-                      Forgot Password?
+                      Forgot PIN?
                     </button>
                   </div>
-                  <div className="relative rounded-xl shadow-xs">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                      <Lock className="w-4 h-4" />
-                    </div>
-                    <input
-                      type="password"
-                      required
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className="block w-full pl-10 pr-4 py-2.5 text-xs font-medium border border-slate-200 rounded-xl focus:ring-2 focus:ring-cre-green focus:border-cre-green focus:outline-hidden bg-slate-50/50"
-                    />
-                  </div>
+                  <PinInput
+                    value={password}
+                    onChange={setPassword}
+                    autoFocus={false}
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1.5">
+                    Default PIN is the last 4 digits of your phone number ({phone.replace(/\D/g, '').slice(-4) || '••••'}).
+                  </p>
                 </div>
               )}
 
@@ -496,7 +505,7 @@ function LoginFormContent() {
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">Place / City *</label>
                     <input
@@ -505,6 +514,17 @@ function LoginFormContent() {
                       value={centerPlace}
                       onChange={(e) => setCenterPlace(e.target.value)}
                       placeholder="e.g. Manjeri"
+                      className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-cre-green outline-hidden bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Landmark (Optional)</label>
+                    <input
+                      type="text"
+                      value={centerLandmark}
+                      onChange={(e) => setCenterLandmark(e.target.value)}
+                      placeholder="e.g. Near Salafi Masjid"
                       className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-cre-green outline-hidden bg-white"
                     />
                   </div>
@@ -643,29 +663,29 @@ function LoginFormContent() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">Admin Phone Number *</label>
                     <input
                       type="tel"
                       required
                       value={newAdminPhone}
-                      onChange={(e) => setNewAdminPhone(e.target.value)}
+                      onChange={(e) => handleNewPhoneChange(e.target.value)}
                       placeholder="e.g. 9876543210"
                       className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-cre-green outline-hidden bg-white"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">Set Initial Password *</label>
-                    <input
-                      type="password"
-                      required
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Set 4-Digit Login PIN *</label>
+                    <PinInput
                       value={newAdminPassword}
-                      onChange={(e) => setNewAdminPassword(e.target.value)}
-                      placeholder="Initial password"
-                      className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-cre-green outline-hidden bg-white"
+                      onChange={setNewAdminPassword}
+                      autoFocus={false}
                     />
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Default: last 4 digits ({newAdminPhone.replace(/\D/g, '').slice(-4) || '••••'})
+                    </p>
                   </div>
                 </div>
               </div>

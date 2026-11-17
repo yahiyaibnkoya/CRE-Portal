@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { dataService } from '@/lib/dataService';
 import { AdminUser } from '@/types';
 import { normalizePhoneNumber, getDefaultPassword } from '@/lib/constants';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import {
   KeyRound,
   UserPlus,
@@ -26,6 +27,7 @@ export default function CenterAdminLoginsPage() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAdmin, setEditingAdmin] = useState<AdminUser | null>(null);
+  const [adminToRemove, setAdminToRemove] = useState<AdminUser | null>(null);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [place, setPlace] = useState('');
@@ -36,6 +38,7 @@ export default function CenterAdminLoginsPage() {
   // Admins who have access to this centre
   const centerAdmins = allUsers.filter((u) => u.centerIds.includes(centerId));
   const activeAdminsCount = centerAdmins.filter((u) => u.isActive).length;
+  const canDeleteAdmin = activeAdminsCount > 1;
 
   const handleOpenAdd = () => {
     if (activeAdminsCount >= 3) {
@@ -104,7 +107,7 @@ export default function CenterAdminLoginsPage() {
       dataService.saveUser(newAdmin);
       setIsModalOpen(false);
       setSuccess(
-        `Administrator added successfully. Default password: ${defaultPwd} (Compulsory change required on first login)`
+        `Administrator added successfully. Default 4-digit PIN: ${defaultPwd} (Compulsory change required on first login)`
       );
     }
 
@@ -119,11 +122,22 @@ export default function CenterAdminLoginsPage() {
   };
 
   const handleRemove = (user: AdminUser) => {
-    if (confirm(`Remove administrator ${user.name} from this centre?`)) {
-      const updatedCenters = user.centerIds.filter((id) => id !== centerId);
-      dataService.saveUser({ ...user, centerIds: updatedCenters });
-      refreshData();
+    if (!canDeleteAdmin) {
+      setError('A centre must have at least one active administrator. You cannot delete the sole administrator; you can edit their details instead.');
+      setTimeout(() => setError(null), 5000);
+      return;
     }
+    setAdminToRemove(user);
+  };
+
+  const handleConfirmRemove = () => {
+    if (!adminToRemove) return;
+    const updatedCenters = adminToRemove.centerIds.filter((id) => id !== centerId);
+    dataService.saveUser({ ...adminToRemove, centerIds: updatedCenters });
+    setAdminToRemove(null);
+    setSuccess(`Administrator removed from this centre.`);
+    setTimeout(() => setSuccess(null), 4000);
+    refreshData();
   };
 
   return (
@@ -228,14 +242,16 @@ export default function CenterAdminLoginsPage() {
                         >
                           <Edit2 className="w-4 h-4" />
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => handleRemove(u)}
-                          className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Remove Administrator from Centre"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {canDeleteAdmin && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemove(u)}
+                            className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Remove Administrator from Centre"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -321,7 +337,7 @@ export default function CenterAdminLoginsPage() {
                     />
                   </div>
                   <p className="text-[10px] text-slate-400 mt-0.5">
-                    Initial password: <span className="font-semibold text-cre-green">{phone ? getDefaultPassword(phone) : 'First 8 digits'}</span>
+                    Default 4-digit PIN: <span className="font-semibold text-cre-green">{phone ? getDefaultPassword(phone) : 'Last 4 digits'}</span>
                   </p>
                 </div>
 
@@ -344,6 +360,17 @@ export default function CenterAdminLoginsPage() {
             </div>
           </div>
         )}
+
+        {/* Confirm Remove Admin Modal */}
+        <ConfirmModal
+          isOpen={!!adminToRemove}
+          title="Remove Administrator"
+          message={`Are you sure you want to remove administrator "${adminToRemove?.name}" (${adminToRemove?.phone}) from this centre? They will no longer have access to this centre.`}
+          confirmText="Remove Administrator"
+          isDanger={true}
+          onConfirm={handleConfirmRemove}
+          onCancel={() => setAdminToRemove(null)}
+        />
       </div>
     </AppShell>
   );

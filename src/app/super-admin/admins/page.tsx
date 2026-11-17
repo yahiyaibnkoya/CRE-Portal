@@ -155,6 +155,11 @@ export default function SuperAdminAdminsPage() {
 
   const handleConfirmDelete = () => {
     if (!deletingAdmin) return;
+    if (deletingAdmin.role === 'SUPER_ADMIN') {
+      setError('Super Admin account cannot be deleted. You can edit the account details instead.');
+      setDeletingAdmin(null);
+      return;
+    }
     if (deletingAdmin.phone === currentSuperAdmin?.phone) {
       setError('You cannot delete your own currently logged-in account.');
       setDeletingAdmin(null);
@@ -254,6 +259,12 @@ export default function SuperAdminAdminsPage() {
               <tbody className="divide-y divide-cre-border">
                 {filteredUsers.map((u) => {
                   const assignedCenters = centers.filter((c) => u.centerIds.includes(c.id));
+                  const isSuperAdmin = u.role === 'SUPER_ADMIN';
+                  const isSoleAdmin = u.centerIds.some((cId) => {
+                    const activeCount = users.filter((o) => o.isActive && o.centerIds.includes(cId)).length;
+                    return activeCount <= 1;
+                  });
+                  const canDelete = !isSuperAdmin && !isSoleAdmin;
 
                   return (
                     <tr key={u.uid} className="hover:bg-slate-50/70 transition-colors">
@@ -325,7 +336,7 @@ export default function SuperAdminAdminsPage() {
                             type="button"
                             onClick={() => setResettingUser(u)}
                             className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-                            title="Reset to default password"
+                            title="Reset to default PIN"
                           >
                             <KeyRound className="w-4 h-4" />
                           </button>
@@ -337,14 +348,16 @@ export default function SuperAdminAdminsPage() {
                           >
                             <Edit2 className="w-4 h-4" />
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => setDeletingAdmin(u)}
-                            className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Delete Administrator"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {canDelete && (
+                            <button
+                              type="button"
+                              onClick={() => setDeletingAdmin(u)}
+                              className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Delete Administrator"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -435,7 +448,7 @@ export default function SuperAdminAdminsPage() {
                     />
                   </div>
                   <p className="mt-1 text-[11px] text-slate-400">
-                    Default initial password will be set to: <span className="font-semibold text-cre-green">{phone ? getDefaultPassword(phone) : 'First 8 digits'}</span>
+                    Default 4-digit PIN: <span className="font-semibold text-cre-green">{phone ? getDefaultPassword(phone) : 'Last 4 digits'}</span>
                   </p>
                 </div>
 
@@ -527,7 +540,7 @@ export default function SuperAdminAdminsPage() {
                 Reset Administrator Password
               </h3>
               <p className="text-xs text-slate-600 mt-2 leading-relaxed">
-                Reset password for <span className="font-bold text-cre-navy">{resettingUser.name}</span> ({resettingUser.phone}) to the default first 8 digits ({getDefaultPassword(resettingUser.phone)})?
+                Reset PIN for <span className="font-bold text-cre-navy">{resettingUser.name}</span> ({resettingUser.phone}) to the default last 4 digits ({getDefaultPassword(resettingUser.phone)})?
               </p>
               <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl my-4 text-[11px] text-slate-500">
                 This administrator will be required to create a new password immediately upon their next login.

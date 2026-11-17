@@ -5,6 +5,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { useAuth } from '@/context/AuthContext';
 import { dataService } from '@/lib/dataService';
 import { Exam, ExamMark, ExamSubject, ExamMode, Student } from '@/types';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import {
   GraduationCap,
   Plus,
@@ -26,6 +27,7 @@ export default function CenterAdminExamsPage() {
 
   const [activeTab, setActiveTab] = useState<'exams' | 'marks'>('exams');
   const [selectedExamId, setSelectedExamId] = useState<string>('');
+  const [deleteExamId, setDeleteExamId] = useState<string | null>(null);
 
   // Add/Edit Exam Modal State
   const [isExamModalOpen, setIsExamModalOpen] = useState(false);
@@ -126,10 +128,14 @@ export default function CenterAdminExamsPage() {
   };
 
   const handleDeleteExam = (examId: string) => {
-    if (confirm('Are you sure you want to delete this examination?')) {
-      dataService.deleteExam(examId, 'Centre Admin');
-      refreshData();
-    }
+    setDeleteExamId(examId);
+  };
+
+  const handleConfirmDeleteExam = () => {
+    if (!deleteExamId) return;
+    dataService.deleteExam(deleteExamId, 'Centre Admin');
+    setDeleteExamId(null);
+    refreshData();
   };
 
   const handleAddSubjectField = () => {
@@ -602,6 +608,17 @@ export default function CenterAdminExamsPage() {
             </div>
           </div>
         )}
+
+        {/* Confirm Delete Exam Modal */}
+        <ConfirmModal
+          isOpen={!!deleteExamId}
+          title="Delete Examination"
+          message="Are you sure you want to delete this examination record and its recorded marks? This action cannot be undone."
+          confirmText="Delete Examination"
+          isDanger={true}
+          onConfirm={handleConfirmDeleteExam}
+          onCancel={() => setDeleteExamId(null)}
+        />
       </div>
     </AppShell>
   );

@@ -18,12 +18,14 @@ import {
   MapPin,
   Building,
 } from 'lucide-react';
+import { PinInput } from '@/components/ui/PinInput';
 
 export default function HomePage() {
   // Modal for "Add CRE Centre"
   const [isAddCenterModalOpen, setIsAddCenterModalOpen] = useState(false);
   const [centerName, setCenterName] = useState('');
   const [place, setPlace] = useState('');
+  const [landmark, setLandmark] = useState('');
   const [state, setState] = useState<'Kerala' | 'Other State'>('Kerala');
   const [district, setDistrict] = useState(KERALA_DISTRICTS[10] || 'Malappuram West');
   const [zoneOrUnit, setZoneOrUnit] = useState<'Zone' | 'Unit'>('Zone');
@@ -39,16 +41,26 @@ export default function HomePage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  const handlePhoneChange = (val: string) => {
+    setAdminPhone(val);
+    const clean = val.replace(/\D/g, '');
+    if (clean.length >= 4 && !adminPassword) {
+      setAdminPassword(clean.slice(-4));
+    }
+  };
+
   const handleRegisterCenterSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
 
-    if (!adminPhone || adminPhone.trim().length < 10) {
+    const cleanPhone = adminPhone.replace(/\D/g, '');
+    if (cleanPhone.length < 10) {
       setErrorMsg('Please enter a valid 10-digit mobile number for the Centre Admin.');
       return;
     }
-    if (!adminPassword || adminPassword.length < 6) {
-      setErrorMsg('Please set a secure initial password (at least 6 characters).');
+    const finalPin = adminPassword || cleanPhone.slice(-4);
+    if (!finalPin || finalPin.length !== 4) {
+      setErrorMsg('Login PIN must be exactly a 4-digit number (e.g. ' + cleanPhone.slice(-4) + ').');
       return;
     }
 
@@ -57,6 +69,7 @@ export default function HomePage() {
         centerData: {
           name: centerName,
           place,
+          landmark: landmark.trim() || undefined,
           state,
           district: state === 'Kerala' ? district : place,
           zoneOrUnit,
@@ -291,7 +304,7 @@ export default function HomePage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
                       Place / City *
@@ -302,6 +315,19 @@ export default function HomePage() {
                       value={place}
                       onChange={(e) => setPlace(e.target.value)}
                       placeholder="e.g. Manjeri"
+                      className="w-full px-3 py-2 text-xs border border-cre-border rounded-xl focus:ring-2 focus:ring-cre-green outline-hidden"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Landmark (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={landmark}
+                      onChange={(e) => setLandmark(e.target.value)}
+                      placeholder="e.g. Near Salafi Masjid"
                       className="w-full px-3 py-2 text-xs border border-cre-border rounded-xl focus:ring-2 focus:ring-cre-green outline-hidden"
                     />
                   </div>
@@ -431,7 +457,7 @@ export default function HomePage() {
               {/* Centre Admin Login Setup */}
               <div className="pt-3 border-t border-cre-border space-y-3">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-cre-navy block">
-                  2. Administrator Account & Initial Password
+                  2. Administrator Account & 4-Digit Login PIN
                 </span>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -462,7 +488,7 @@ export default function HomePage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
                       Admin Phone Number *
@@ -471,7 +497,7 @@ export default function HomePage() {
                       type="tel"
                       required
                       value={adminPhone}
-                      onChange={(e) => setAdminPhone(e.target.value)}
+                      onChange={(e) => handlePhoneChange(e.target.value)}
                       placeholder="e.g. 9876543210"
                       className="w-full px-3 py-2 text-xs border border-cre-border rounded-xl focus:ring-2 focus:ring-cre-green outline-hidden"
                     />
@@ -479,16 +505,16 @@ export default function HomePage() {
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Set Initial Password *
+                      Set 4-Digit Login PIN *
                     </label>
-                    <input
-                      type="password"
-                      required
+                    <PinInput
                       value={adminPassword}
-                      onChange={(e) => setAdminPassword(e.target.value)}
-                      placeholder="Initial password (min 6 chars)"
-                      className="w-full px-3 py-2 text-xs border border-cre-border rounded-xl focus:ring-2 focus:ring-cre-green outline-hidden"
+                      onChange={setAdminPassword}
+                      autoFocus={false}
                     />
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Default: last 4 digits of phone number ({adminPhone.replace(/\D/g, '').slice(-4) || '••••'})
+                    </p>
                   </div>
                 </div>
               </div>

@@ -139,7 +139,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginAdmin = async (phone: string, passwordPlain: string) => {
     dataService.init();
     const cleanPhone = normalizePhoneNumber(phone);
-    const user = dataService.getUserByPhone(cleanPhone);
+    let user = dataService.getUserByPhone(cleanPhone);
+
+    // Multi-device support: fetch directly from Firestore if not in local cache
+    if (!user) {
+      user = (await dataService.fetchUserFromFirestore(cleanPhone)) || undefined;
+    }
 
     if (!user) {
       return { success: false, error: 'User with this phone number not found.' };
@@ -150,9 +155,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     // Validate password
-    const valid = dataService.checkUserPassword(cleanPhone, passwordPlain);
+    let valid = dataService.checkUserPassword(cleanPhone, passwordPlain);
     if (!valid) {
-      return { success: false, error: 'Invalid password. If you forgot your password, click Forgot Password.' };
+      // Re-fetch from Firestore in case password was updated on another device
+      const cloudUser = await dataService.fetchUserFromFirestore(cleanPhone);
+      if (cloudUser) {
+        user = cloudUser;
+        valid = dataService.checkUserPassword(cleanPhone, passwordPlain);
+      }
+    }
+
+    if (!valid) {
+      return { success: false, error: 'Invalid 4-digit PIN. If you forgot your password, please contact the Super Admin.' };
     }
 
     setRole(user.role);
@@ -193,7 +207,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: false, error: 'Please enter a valid phone number.' };
     }
 
-    const matches = dataService.getStudentsByPhone(cleanPhone);
+    let matches = dataService.getStudentsByPhone(cleanPhone);
+    if (matches.length === 0) {
+      // Multi-device fallback: check Firestore
+      matches = await dataService.fetchStudentsFromFirestore(cleanPhone);
+    }
+
     if (matches.length === 0) {
       return {
         success: false,

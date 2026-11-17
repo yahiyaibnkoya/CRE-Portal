@@ -15,6 +15,7 @@ export interface AdminUser {
   place?: string;
   role: 'SUPER_ADMIN' | 'CENTER_ADMIN';
   centerIds: string[]; // Center IDs assigned to this admin
+  passwordPin?: string; // 4-digit PIN password
   mustChangePassword: boolean;
   isActive: boolean;
   createdAt: string;
@@ -25,6 +26,7 @@ export interface Center {
   id: string;
   name: string;
   place: string;
+  landmark?: string; // Landmark near Place/City
   state: string; // 'Kerala' | 'Other State'
   district: string;
   otherStateName?: string;
@@ -51,6 +53,7 @@ export interface Student {
   centerId: string;
   admissionNumber: string; // auto-generated e.g. CRE-101
   name: string;
+  gender: 'Boy' | 'Girl'; // Required: Boy or Girl
   parentName: string;
   studentPhone?: string;
   parentPhone?: string;

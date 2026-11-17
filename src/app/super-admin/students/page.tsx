@@ -106,6 +106,7 @@ export default function SuperAdminStudentsPage() {
                 <tr>
                   <th className="py-3.5 px-4">Adm No</th>
                   <th className="py-3.5 px-4">Student Name</th>
+                  <th className="py-3.5 px-4">Gender</th>
                   <th className="py-3.5 px-4">Parent / Guardian</th>
                   <th className="py-3.5 px-4">Centre</th>
                   <th className="py-3.5 px-4">Parent Phone</th>
@@ -127,6 +128,17 @@ export default function SuperAdminStudentsPage() {
                       <td className="py-3.5 px-4 font-bold text-slate-900">
                         {s.name}
                         <span className="block text-[10px] text-slate-400 font-normal">{s.place}</span>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span
+                          className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                            s.gender === 'Girl'
+                              ? 'bg-pink-50 text-pink-700 border border-pink-200'
+                              : 'bg-blue-50 text-blue-700 border border-blue-200'
+                          }`}
+                        >
+                          {s.gender || 'Boy'}
+                        </span>
                       </td>
                       <td className="py-3.5 px-4 text-slate-700">{s.parentName}</td>
                       <td className="py-3.5 px-4 text-slate-600">
@@ -187,7 +199,12 @@ export default function SuperAdminStudentsPage() {
                     {viewingStudent.name.charAt(0)}
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-cre-navy">{viewingStudent.name}</h3>
+                    <div className="flex items-center space-x-2">
+                      <h3 className="text-sm font-bold text-cre-navy">{viewingStudent.name}</h3>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${viewingStudent.gender === 'Girl' ? 'bg-pink-100 text-pink-700' : 'bg-blue-100 text-blue-700'}`}>
+                        {viewingStudent.gender || 'Boy'}
+                      </span>
+                    </div>
                     <p className="text-[11px] text-slate-500">
                       Adm No: {viewingStudent.admissionNumber}
                     </p>
