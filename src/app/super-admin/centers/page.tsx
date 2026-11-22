@@ -24,6 +24,7 @@ import {
   Users,
   AlertTriangle,
   X,
+  GraduationCap,
 } from 'lucide-react';
 
 export default function SuperAdminCentersPage() {
@@ -31,6 +32,13 @@ export default function SuperAdminCentersPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [districtFilter, setDistrictFilter] = useState<string>('ALL');
+
+  // Inline Add Faculty Modal
+  const [isAddFacultyModalOpen, setIsAddFacultyModalOpen] = useState(false);
+  const [newFacName, setNewFacName] = useState('');
+  const [newFacPhone, setNewFacPhone] = useState('');
+  const [newFacPlace, setNewFacPlace] = useState('');
+  const [newFacQual, setNewFacQual] = useState('');
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -62,6 +70,29 @@ export default function SuperAdminCentersPage() {
   const [status, setStatus] = useState<CenterStatus>('Active');
 
   const centers = dataService.getCenters();
+  const approvedFaculties = dataService.getFaculties('Approved');
+
+  const handleCreateInlineFaculty = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newFacName.trim()) return;
+    const saved = dataService.saveFaculty(
+      {
+        name: newFacName.trim(),
+        phone: newFacPhone.trim(),
+        place: newFacPlace.trim(),
+        qualification: newFacQual.trim(),
+        status: 'Approved',
+      },
+      'Super Admin'
+    );
+    setFacultyName(saved.name);
+    setNewFacName('');
+    setNewFacPhone('');
+    setNewFacPlace('');
+    setNewFacQual('');
+    setIsAddFacultyModalOpen(false);
+    refreshData();
+  };
 
   const filteredCenters = centers.filter((c) => {
     if (statusFilter !== 'ALL' && c.status !== statusFilter) return false;
@@ -198,6 +229,99 @@ export default function SuperAdminCentersPage() {
           </button>
         </div>
 
+        {/* Dynamic Exciting Filter Stat Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+          <button
+            type="button"
+            onClick={() => setStatusFilter('ALL')}
+            className={`p-4 rounded-2xl border text-left transition-all ${
+              statusFilter === 'ALL'
+                ? 'bg-cre-navy text-white border-cre-navy shadow-md scale-[1.02]'
+                : 'bg-white text-slate-800 border-cre-border hover:border-slate-300 shadow-xs'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className={`text-[11px] font-bold uppercase tracking-wider ${statusFilter === 'ALL' ? 'text-white/80' : 'text-slate-400'}`}>
+                Total Centres
+              </span>
+              <Building2 className={`w-4 h-4 ${statusFilter === 'ALL' ? 'text-white' : 'text-cre-navy'}`} />
+            </div>
+            <div className="text-2xl font-black mt-2">{centers.length}</div>
+            <span className={`text-[10px] mt-0.5 block ${statusFilter === 'ALL' ? 'text-white/70' : 'text-slate-400'}`}>
+              Click to view all affiliated centres
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setStatusFilter(statusFilter === 'Active' ? 'ALL' : 'Active')}
+            className={`p-4 rounded-2xl border text-left transition-all ${
+              statusFilter === 'Active'
+                ? 'bg-cre-green text-white border-cre-green shadow-md scale-[1.02]'
+                : 'bg-white text-slate-800 border-cre-border hover:border-cre-green/40 shadow-xs'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className={`text-[11px] font-bold uppercase tracking-wider ${statusFilter === 'Active' ? 'text-white/80' : 'text-cre-green'}`}>
+                Active Centres
+              </span>
+              <PlayCircle className={`w-4 h-4 ${statusFilter === 'Active' ? 'text-white' : 'text-cre-green'}`} />
+            </div>
+            <div className={`text-2xl font-black mt-2 ${statusFilter === 'Active' ? 'text-white' : 'text-cre-green'}`}>
+              {centers.filter((c) => c.status === 'Active').length}
+            </div>
+            <span className={`text-[10px] mt-0.5 block ${statusFilter === 'Active' ? 'text-white/70' : 'text-slate-400'}`}>
+              Conducting regular classes
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setStatusFilter(statusFilter === 'Pending Approval' ? 'ALL' : 'Pending Approval')}
+            className={`p-4 rounded-2xl border text-left transition-all ${
+              statusFilter === 'Pending Approval'
+                ? 'bg-amber-500 text-white border-amber-500 shadow-md scale-[1.02]'
+                : 'bg-white text-slate-800 border-cre-border hover:border-amber-400 shadow-xs'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className={`text-[11px] font-bold uppercase tracking-wider ${statusFilter === 'Pending Approval' ? 'text-white/80' : 'text-amber-600'}`}>
+                Pending Approval
+              </span>
+              <PauseCircle className={`w-4 h-4 ${statusFilter === 'Pending Approval' ? 'text-white' : 'text-amber-500'}`} />
+            </div>
+            <div className={`text-2xl font-black mt-2 ${statusFilter === 'Pending Approval' ? 'text-white' : 'text-amber-600'}`}>
+              {centers.filter((c) => c.status === 'Pending Approval').length}
+            </div>
+            <span className={`text-[10px] mt-0.5 block ${statusFilter === 'Pending Approval' ? 'text-white/70' : 'text-slate-400'}`}>
+              Awaiting Super Admin activation
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setStatusFilter(statusFilter === 'Suspended' ? 'ALL' : 'Suspended')}
+            className={`p-4 rounded-2xl border text-left transition-all ${
+              statusFilter === 'Suspended'
+                ? 'bg-red-600 text-white border-red-600 shadow-md scale-[1.02]'
+                : 'bg-white text-slate-800 border-cre-border hover:border-red-300 shadow-xs'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className={`text-[11px] font-bold uppercase tracking-wider ${statusFilter === 'Suspended' ? 'text-white/80' : 'text-red-500'}`}>
+                Suspended / Inactive
+              </span>
+              <AlertTriangle className={`w-4 h-4 ${statusFilter === 'Suspended' ? 'text-white' : 'text-red-500'}`} />
+            </div>
+            <div className={`text-2xl font-black mt-2 ${statusFilter === 'Suspended' ? 'text-white' : 'text-red-600'}`}>
+              {centers.filter((c) => c.status === 'Suspended' || c.status === 'Archived').length}
+            </div>
+            <span className={`text-[10px] mt-0.5 block ${statusFilter === 'Suspended' ? 'text-white/70' : 'text-slate-400'}`}>
+              Temporarily inactive
+            </span>
+          </button>
+        </div>
+
         {/* Search & Filters */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="relative">
@@ -209,6 +333,15 @@ export default function SuperAdminCentersPage() {
               placeholder="Search centres by name, place, district..."
               className="w-full pl-10 pr-4 py-2 text-xs border border-cre-border rounded-xl bg-white focus:ring-2 focus:ring-cre-green focus:outline-hidden"
             />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 text-xs"
+              >
+                Clear
+              </button>
+            )}
           </div>
 
           <div className="flex items-center space-x-2 bg-white px-3 py-2 rounded-xl border border-cre-border text-xs">
@@ -218,11 +351,11 @@ export default function SuperAdminCentersPage() {
               onChange={(e) => setStatusFilter(e.target.value)}
               className="bg-transparent text-slate-800 font-semibold focus:outline-hidden cursor-pointer w-full"
             >
-              <option value="ALL">All Statuses</option>
-              <option value="Active">Active</option>
-              <option value="Pending Approval">Pending Approval</option>
-              <option value="Suspended">Suspended</option>
-              <option value="Archived">Archived</option>
+              <option value="ALL">All Statuses ({centers.length})</option>
+              <option value="Active">Active ({centers.filter((c) => c.status === 'Active').length})</option>
+              <option value="Pending Approval">Pending Approval ({centers.filter((c) => c.status === 'Pending Approval').length})</option>
+              <option value="Suspended">Suspended ({centers.filter((c) => c.status === 'Suspended').length})</option>
+              <option value="Archived">Archived ({centers.filter((c) => c.status === 'Archived').length})</option>
             </select>
           </div>
 
@@ -245,7 +378,7 @@ export default function SuperAdminCentersPage() {
 
         {/* Centres Card / Grid List */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filteredCenters.map((c) => {
+          {filteredCenters.map((c, idx) => {
             const studentCount = dataService.getStudents(c.id).filter((s) => s.status === 'Active').length;
             const adminCount = c.adminPhones ? c.adminPhones.length : 0;
 
@@ -256,11 +389,16 @@ export default function SuperAdminCentersPage() {
               >
                 <div className="p-5">
                   <div className="flex items-start justify-between gap-2 mb-3">
-                    <div>
-                      <h3 className="text-sm font-bold text-cre-navy line-clamp-1">{c.name}</h3>
-                      <div className="flex items-center text-xs text-slate-500 mt-1">
-                        <MapPin className="w-3.5 h-3.5 mr-1 text-slate-400 shrink-0" />
-                        <span>{c.place}{c.landmark ? ` (${c.landmark})` : ''}, {c.state === 'Kerala' ? c.district : c.otherStateName}</span>
+                    <div className="flex items-start space-x-2.5">
+                      <span className="shrink-0 px-2 py-0.5 rounded-lg bg-cre-navy-light text-cre-navy font-mono font-black text-[11px] mt-0.5">
+                        #{idx + 1}
+                      </span>
+                      <div>
+                        <h3 className="text-sm font-bold text-cre-navy line-clamp-1">{c.name}</h3>
+                        <div className="flex items-center text-xs text-slate-500 mt-1">
+                          <MapPin className="w-3.5 h-3.5 mr-1 text-slate-400 shrink-0" />
+                          <span>{c.place}{c.landmark ? ` (${c.landmark})` : ''}, {c.state === 'Kerala' ? c.district : c.otherStateName}</span>
+                        </div>
                       </div>
                     </div>
                     <span
@@ -607,16 +745,37 @@ export default function SuperAdminCentersPage() {
                 {/* Faculty & Default Fee */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Faculty Name (Optional)
-                    </label>
-                    <input
-                      type="text"
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-bold text-slate-700">
+                        Assigned Faculty (Optional)
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setIsAddFacultyModalOpen(true)}
+                        className="text-[11px] font-bold text-cre-green hover:underline inline-flex items-center"
+                      >
+                        <Plus className="w-3 h-3 mr-0.5" />
+                        + Add New Faculty
+                      </button>
+                    </div>
+                    <select
                       value={facultyName}
                       onChange={(e) => setFacultyName(e.target.value)}
-                      placeholder="e.g. Usthad Abdul Rasheed Salafi"
-                      className="w-full px-3.5 py-2 text-xs border border-cre-border rounded-xl"
-                    />
+                      className="w-full px-3.5 py-2 text-xs border border-cre-border rounded-xl focus:ring-2 focus:ring-cre-green focus:outline-hidden font-semibold text-slate-800"
+                    >
+                      <option value="">— No Faculty Assigned (Optional) —</option>
+                      {approvedFaculties.map((f) => (
+                        <option key={f.id} value={f.name}>
+                          {f.name} {f.place ? `(${f.place})` : ''} {f.qualification ? `• ${f.qualification}` : ''}
+                        </option>
+                      ))}
+                      {facultyName && !approvedFaculties.some((f) => f.name === facultyName) && (
+                        <option value={facultyName}>{facultyName} (Custom)</option>
+                      )}
+                    </select>
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Select from approved faculties or click &quot;+ Add New Faculty&quot;.
+                    </p>
                   </div>
 
                   <div>
@@ -776,6 +935,105 @@ export default function SuperAdminCentersPage() {
                   {isPermanentDelete ? 'Permanently Delete' : 'Archive Centre'}
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* INLINE ADD FACULTY MODAL */}
+        {isAddFacultyModalOpen && (
+          <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-cre-border animate-in fade-in zoom-in-95">
+              <div className="flex items-center justify-between pb-3 border-b border-cre-border">
+                <div className="flex items-center space-x-2.5">
+                  <div className="p-2 rounded-xl bg-cre-green-light text-cre-green">
+                    <GraduationCap className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-cre-navy">Add New Faculty Member</h3>
+                    <p className="text-[11px] text-slate-400">Creates and approves an instructor for CRE centres</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsAddFacultyModalOpen(false)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateInlineFaculty} className="mt-4 space-y-3.5">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Faculty Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newFacName}
+                    onChange={(e) => setNewFacName(e.target.value)}
+                    placeholder="e.g. Usthad Abdul Rasheed Salafi"
+                    className="w-full px-3 py-2 text-xs border border-cre-border rounded-xl focus:ring-2 focus:ring-cre-green focus:outline-hidden"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Mobile Phone (Optional)
+                  </label>
+                  <input
+                    type="tel"
+                    value={newFacPhone}
+                    onChange={(e) => setNewFacPhone(e.target.value)}
+                    placeholder="e.g. 9876543210"
+                    className="w-full px-3 py-2 text-xs border border-cre-border rounded-xl focus:ring-2 focus:ring-cre-green focus:outline-hidden"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Place / City (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={newFacPlace}
+                      onChange={(e) => setNewFacPlace(e.target.value)}
+                      placeholder="e.g. Malappuram"
+                      className="w-full px-3 py-2 text-xs border border-cre-border rounded-xl focus:ring-2 focus:ring-cre-green focus:outline-hidden"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Qualification (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={newFacQual}
+                      onChange={(e) => setNewFacQual(e.target.value)}
+                      placeholder="e.g. MA Islamic Studies"
+                      className="w-full px-3 py-2 text-xs border border-cre-border rounded-xl focus:ring-2 focus:ring-cre-green focus:outline-hidden"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddFacultyModalOpen(false)}
+                    className="px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 text-xs font-bold text-white bg-cre-green hover:bg-cre-green-hover rounded-xl shadow-xs"
+                  >
+                    Save & Assign Faculty
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}

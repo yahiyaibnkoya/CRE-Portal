@@ -5,6 +5,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { useAuth } from '@/context/AuthContext';
 import { dataService } from '@/lib/dataService';
 import { Award, BookOpen, CheckCircle, XCircle } from 'lucide-react';
+import { ChildSwitcherBar } from '@/components/student/ChildSwitcherBar';
 
 export default function StudentExamsPage() {
   const { selectedStudent, activeCenter } = useAuth();
@@ -24,6 +25,9 @@ export default function StudentExamsPage() {
   return (
     <AppShell>
       <div className="space-y-6 max-w-4xl">
+        {/* Multi-Child Switcher Bar */}
+        <ChildSwitcherBar />
+
         {/* Header */}
         <div className="pb-2 border-b border-cre-border">
           <h1 className="text-xl sm:text-2xl font-black text-cre-navy">

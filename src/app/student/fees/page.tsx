@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { dataService } from '@/lib/dataService';
 import { formatCurrency } from '@/lib/constants';
 import { IndianRupee, Clock, History, CheckCircle, AlertCircle } from 'lucide-react';
+import { ChildSwitcherBar } from '@/components/student/ChildSwitcherBar';
 
 export default function StudentFeesPage() {
   const { selectedStudent, activeCenter } = useAuth();
@@ -31,6 +32,9 @@ export default function StudentFeesPage() {
   return (
     <AppShell>
       <div className="space-y-6 max-w-4xl">
+        {/* Multi-Child Switcher Bar */}
+        <ChildSwitcherBar />
+
         {/* Header */}
         <div className="pb-2 border-b border-cre-border">
           <h1 className="text-xl sm:text-2xl font-black text-cre-navy">

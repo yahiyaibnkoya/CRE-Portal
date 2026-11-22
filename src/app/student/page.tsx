@@ -6,6 +6,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { useAuth } from '@/context/AuthContext';
 import { dataService } from '@/lib/dataService';
 import { formatCurrency } from '@/lib/constants';
+import { ChildSwitcherBar } from '@/components/student/ChildSwitcherBar';
 import {
   GraduationCap,
   CalendarCheck,
@@ -16,10 +17,11 @@ import {
   ArrowRight,
   Phone,
   CheckCircle,
+  Users,
 } from 'lucide-react';
 
 export default function StudentOverviewPage() {
-  const { selectedStudent, activeCenter } = useAuth();
+  const { selectedStudent, activeCenter, associatedStudents, switchStudentSession } = useAuth();
 
   const studentId = selectedStudent?.id || '';
   const centerId = selectedStudent?.centerId || '';
@@ -31,12 +33,12 @@ export default function StudentOverviewPage() {
   }, [studentId, centerId]);
 
   // Current Month Fee
-  const currentMonth = '2026-11';
+  const currentMonth = useMemo(() => new Date().toISOString().slice(0, 7), []);
   const feeRec = useMemo(() => {
     if (!studentId || !centerId) return null;
     const fees = dataService.getMonthlyFees(centerId, currentMonth);
     return fees.find((f) => f.studentId === studentId) || null;
-  }, [studentId, centerId]);
+  }, [studentId, centerId, currentMonth]);
 
   // Latest Exam
   const examMarks = useMemo(() => {
@@ -50,6 +52,51 @@ export default function StudentOverviewPage() {
   }, [centerId]);
 
   const latestExam = exams.length > 0 ? exams[0] : null;
+
+  if (!selectedStudent && associatedStudents.length > 0) {
+    return (
+      <AppShell>
+        <div className="max-w-2xl mx-auto py-8 sm:py-12 px-4 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-cre-green-light text-cre-green flex items-center justify-center mx-auto mb-4 shadow-sm">
+            <Users className="w-8 h-8" />
+          </div>
+          <h2 className="text-xl sm:text-2xl font-black text-cre-navy">Select Which Student to View</h2>
+          <p className="text-xs text-slate-500 mt-1 mb-6">
+            Multiple students are enrolled under this phone number. Choose whose records to open:
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
+            {associatedStudents.map((child) => (
+              <button
+                key={child.id}
+                type="button"
+                onClick={() => switchStudentSession(child)}
+                className="p-5 bg-white rounded-2xl border-2 border-cre-border hover:border-cre-green hover:shadow-lg transition-all flex flex-col justify-between group"
+              >
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-cre-green block">
+                    {child.gender || 'Student'}
+                  </span>
+                  <h3 className="text-base font-bold text-cre-navy mt-1 group-hover:text-cre-green transition-colors">
+                    {child.name}
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-1 font-mono">
+                    Admission No: {child.admissionNumber}
+                  </p>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Location: {child.place || '—'}
+                  </p>
+                </div>
+                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-cre-navy group-hover:text-cre-green">
+                  <span>Open Student Portal</span>
+                  <ArrowRight className="w-4 h-4" />
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </AppShell>
+    );
+  }
 
   if (!selectedStudent) {
     return (
@@ -67,6 +114,9 @@ export default function StudentOverviewPage() {
   return (
     <AppShell>
       <div className="space-y-6 max-w-5xl">
+        {/* Child Switcher Bar for Multi-Child Parents */}
+        <ChildSwitcherBar />
+
         {/* Welcome Banner */}
         <div className="bg-white p-6 rounded-2xl border border-cre-border shadow-xs flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="flex items-center space-x-4">

@@ -251,6 +251,7 @@ export default function CenterAdminAttendancePage() {
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 border-b border-cre-border text-[11px] font-bold text-cre-navy uppercase tracking-wider">
                     <tr>
+                      <th className="py-3.5 px-4">#</th>
                       <th className="py-3.5 px-4">Adm No</th>
                       <th className="py-3.5 px-4">Student Name</th>
                       <th className="py-3.5 px-4">Parent</th>
@@ -259,11 +260,14 @@ export default function CenterAdminAttendancePage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-cre-border">
-                    {activeStudents.map((st) => {
+                    {activeStudents.map((st, idx) => {
                       const cur = attendanceMap[st.id] || { status: 'Present', remarks: '' };
 
                       return (
                         <tr key={st.id} className="hover:bg-slate-50/70 transition-colors">
+                          <td className="py-3.5 px-4 font-bold text-slate-400">
+                            {idx + 1}
+                          </td>
                           <td className="py-3.5 px-4 font-mono font-bold text-cre-navy">
                             {st.admissionNumber}
                           </td>
@@ -353,6 +357,7 @@ export default function CenterAdminAttendancePage() {
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50 border-b border-cre-border text-[11px] font-bold text-cre-navy uppercase tracking-wider">
                   <tr>
+                    <th className="py-3.5 px-4">#</th>
                     <th className="py-3.5 px-4">Adm No</th>
                     <th className="py-3.5 px-4">Student Name</th>
                     <th className="py-3.5 px-4">Total Conducted</th>
@@ -363,8 +368,11 @@ export default function CenterAdminAttendancePage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-cre-border">
-                  {studentSummaries.map(({ student, totalConducted, present, absent, leave, percentage }) => (
+                  {studentSummaries.map(({ student, totalConducted, present, absent, leave, percentage }, idx) => (
                     <tr key={student.id} className="hover:bg-slate-50">
+                      <td className="py-3.5 px-4 font-bold text-slate-400">
+                        {idx + 1}
+                      </td>
                       <td className="py-3.5 px-4 font-mono font-bold text-cre-navy">
                         {student.admissionNumber}
                       </td>

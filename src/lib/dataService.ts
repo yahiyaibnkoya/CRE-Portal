@@ -10,12 +10,16 @@ import {
   Exam,
   ExamMark,
   DonatedContact,
+  Faculty,
+  FacultyStatus,
   SystemSettings,
   AuditLog,
   AttendanceStatus,
   FeeStatus,
   ContactStatus,
   ExamMode,
+  StudentStatus,
+  CenterStatus,
 } from '@/types';
 import {
   SUPER_ADMIN_DEFAULT_PHONE,
@@ -25,49 +29,16 @@ import {
   normalizePhoneNumber,
   getDefaultPassword,
 } from './constants';
-import { db, auth, isFirebaseConfigured, getInternalEmail } from './firebase';
+import { db } from './firebase';
 import {
   collection,
   doc,
-  getDoc,
   getDocs,
   setDoc,
-  updateDoc,
   deleteDoc,
   query,
   where,
-  orderBy,
-  addDoc,
 } from 'firebase/firestore';
-import {
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  updatePassword,
-  signOut,
-} from 'firebase/auth';
-
-// Storage keys for local-first/offline backup
-const STORAGE_PREFIX = 'cre_portal_';
-const getKey = (key: string) => `${STORAGE_PREFIX}${key}`;
-
-function getLocal<T>(key: string, defaultValue: T): T {
-  if (typeof window === 'undefined') return defaultValue;
-  try {
-    const raw = localStorage.getItem(getKey(key));
-    return raw ? JSON.parse(raw) : defaultValue;
-  } catch {
-    return defaultValue;
-  }
-}
-
-function setLocal<T>(key: string, value: T): void {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(getKey(key), JSON.stringify(value));
-  } catch (err) {
-    console.error('LocalStorage write error:', err);
-  }
-}
 
 // Initial default settings
 export const DEFAULT_SETTINGS: SystemSettings = {
@@ -78,23 +49,29 @@ export const DEFAULT_SETTINGS: SystemSettings = {
   districts: [...KERALA_DISTRICTS],
 };
 
-// Initial Seed Data: ONLY the primary Super Admin, NO demo data!
-function getInitialSeedData() {
-  const superAdmin: AdminUser = {
+function getDefaultSuperAdmin(): AdminUser {
+  return {
     uid: 'super-admin-01',
     phone: SUPER_ADMIN_DEFAULT_PHONE,
     name: 'Wisdom Super Admin',
     role: 'SUPER_ADMIN',
     centerIds: [],
     passwordPin: SUPER_ADMIN_DEFAULT_PASSWORD, // '9944'
-    mustChangePassword: true,
+    mustChangePassword: false,
     isActive: true,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
+}
 
-  return {
-    users: [superAdmin],
+class DataService {
+  private inited = false;
+  private syncing = false;
+
+  // In-memory cache: Sole runtime store populated directly from Firestore
+  // NEVER persisted to LocalStorage!
+  private cache = {
+    users: [getDefaultSuperAdmin()] as AdminUser[],
     centers: [] as Center[],
     students: [] as Student[],
     attendance: [] as AttendanceRecord[],
@@ -105,14 +82,10 @@ function getInitialSeedData() {
     exams: [] as Exam[],
     examMarks: [] as ExamMark[],
     donatedContacts: [] as DonatedContact[],
+    faculties: [] as Faculty[],
     settings: DEFAULT_SETTINGS,
     auditLogs: [] as AuditLog[],
   };
-}
-
-class DataService {
-  private inited = false;
-  private firestoreSynced = false;
 
   private async syncDocToFirestore(collName: string, id: string, data: any) {
     try {
@@ -136,56 +109,25 @@ class DataService {
 
   public init() {
     if (this.inited || typeof window === 'undefined') return;
-
-    // 1. One-time clean purge is marked complete without modifying any real data
-    localStorage.setItem(getKey('demo_purged_v2'), 'true');
-
-    // 2. Migration for 4-Digit Password PIN
-    const v3Done = localStorage.getItem(getKey('migration_v3_4digit_pin'));
-    if (!v3Done) {
-      const users = getLocal<AdminUser[]>('users', []);
-      users.forEach((u) => {
-        const norm = normalizePhoneNumber(u.phone);
-        const last4 = getDefaultPassword(norm);
-        if (!u.passwordPin || u.passwordPin.length !== 4) {
-          u.passwordPin = last4;
-        }
-        // Clear obsolete 8-digit custom password
-        const saved = getLocal<string | null>(`pwd_${norm}`, null);
-        if (saved && saved.length !== 4) {
-          localStorage.removeItem(getKey(`pwd_${norm}`));
-        }
-      });
-      setLocal('users', users);
-      localStorage.setItem(getKey('migration_v3_4digit_pin'), 'true');
-    }
-
-    // 3. Initial seed if storage is empty
-    const existing = localStorage.getItem(getKey('users'));
-    if (!existing) {
-      const seed = getInitialSeedData();
-      setLocal('users', seed.users);
-      setLocal('centers', seed.centers);
-      setLocal('students', seed.students);
-      setLocal('attendance', seed.attendance);
-      setLocal('monthlyFees', seed.monthlyFees);
-      setLocal('feePayments', seed.feePayments);
-      setLocal('donations', seed.donations);
-      setLocal('expenses', seed.expenses);
-      setLocal('exams', seed.exams);
-      setLocal('examMarks', seed.examMarks);
-      setLocal('donatedContacts', seed.donatedContacts);
-      setLocal('settings', seed.settings);
-      setLocal('auditLogs', seed.auditLogs);
-    }
-
     this.inited = true;
 
-    // 4. Background Cloud Sync with Firebase Firestore so added data persists across re-deployments
-    if (!this.firestoreSynced && db && typeof window !== 'undefined') {
-      this.firestoreSynced = true;
-      this.syncWithFirestore();
+    // RULE ENFORCEMENT: Purge any legacy cre_portal_* keys from browser localStorage
+    // No application data is EVER kept in localStorage!
+    try {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('cre_portal_')) {
+          keysToRemove.push(k);
+        }
+      }
+      keysToRemove.forEach((k) => localStorage.removeItem(k));
+    } catch {
+      // LocalStorage access check
     }
+
+    // Trigger initial background sync with Cloud Firestore
+    this.syncWithFirestore();
   }
 
   public async ensureSynced(): Promise<void> {
@@ -193,59 +135,89 @@ class DataService {
     await this.syncWithFirestore();
   }
 
+  public async syncWithFirestore(): Promise<void> {
+    if (!db || typeof window === 'undefined' || this.syncing) return;
+    this.syncing = true;
+
+    try {
+      const collectionsToSync: Array<keyof typeof this.cache> = [
+        'users',
+        'centers',
+        'students',
+        'attendance',
+        'monthlyFees',
+        'feePayments',
+        'donations',
+        'expenses',
+        'exams',
+        'examMarks',
+        'donatedContacts',
+        'faculties',
+        'auditLogs',
+      ];
+
+      for (const collName of collectionsToSync) {
+        try {
+          const snap = await getDocs(collection(db, collName));
+          const items: any[] = [];
+          snap.forEach((d) => items.push(d.data()));
+
+          if (collName === 'users') {
+            if (items.length === 0) {
+              const defAdmin = getDefaultSuperAdmin();
+              this.cache.users = [defAdmin];
+              await this.syncDocToFirestore('users', defAdmin.uid, defAdmin);
+            } else {
+              this.cache.users = items as AdminUser[];
+            }
+          } else {
+            (this.cache as any)[collName] = items;
+          }
+        } catch (innerErr) {
+          console.warn(`Error pulling collection ${collName} from Firestore:`, innerErr);
+        }
+      }
+
+      // Settings doc sync
+      try {
+        const setSnap = await getDocs(collection(db, 'settings'));
+        if (!setSnap.empty) {
+          this.cache.settings = { ...DEFAULT_SETTINGS, ...setSnap.docs[0].data() };
+        }
+      } catch {
+        // Non-critical
+      }
+    } catch (err) {
+      console.warn('Firestore sync error:', err);
+    } finally {
+      this.syncing = false;
+    }
+  }
+
   public async fetchUserFromFirestore(phone: string): Promise<AdminUser | null> {
     if (!db || typeof window === 'undefined') return null;
     try {
       const norm = normalizePhoneNumber(phone);
-      // 1. Try direct Firestore query
       let snap = await getDocs(query(collection(db, 'users'), where('phone', '==', norm)));
-
-      // 2. If not found, fetch all user docs (handles any formatting variations across devices)
       if (snap.empty) {
         snap = await getDocs(collection(db, 'users'));
       }
 
       if (!snap.empty) {
-        const users = this.getUsers();
         let matchedUser: AdminUser | null = null;
-
         snap.forEach((d) => {
           const u = d.data() as AdminUser;
           const uNorm = normalizePhoneNumber(u.phone);
-          const idx = users.findIndex(
+          const idx = this.cache.users.findIndex(
             (item) => item.uid === u.uid || normalizePhoneNumber(item.phone) === uNorm
           );
-          if (idx >= 0) {
-            users[idx] = { ...users[idx], ...u };
-          } else {
-            users.push(u);
-          }
+          if (idx >= 0) this.cache.users[idx] = { ...this.cache.users[idx], ...u };
+          else this.cache.users.push(u);
 
           if (uNorm === norm) {
             matchedUser = u;
           }
         });
-
-        setLocal('users', users);
-
-        // Also sync centers to guarantee the centre object exists on this device
-        try {
-          const centersSnap = await getDocs(collection(db, 'centers'));
-          if (!centersSnap.empty) {
-            const localCenters = this.getCenters();
-            const mergedCenters = [...localCenters];
-            centersSnap.forEach((cd) => {
-              const c = cd.data() as Center;
-              const cIdx = mergedCenters.findIndex((item) => item.id === c.id);
-              if (cIdx >= 0) mergedCenters[cIdx] = c;
-              else mergedCenters.push(c);
-            });
-            setLocal('centers', mergedCenters);
-          }
-        } catch {
-          // Non-critical
-        }
-
         return matchedUser;
       }
     } catch (err) {
@@ -260,8 +232,6 @@ class DataService {
       const norm = normalizePhoneNumber(phone);
       const snap = await getDocs(collection(db, 'students'));
       const matching: Student[] = [];
-      const local = getLocal<Student[]>('students', []);
-      const merged = [...local];
 
       snap.forEach((d) => {
         const s = d.data() as Student;
@@ -270,88 +240,20 @@ class DataService {
         if (pPhone === norm || sPhone === norm) {
           matching.push(s);
         }
-        const idx = merged.findIndex((x) => x.id === s.id);
-        if (idx >= 0) merged[idx] = s;
-        else merged.push(s);
+        const idx = this.cache.students.findIndex((x) => x.id === s.id);
+        if (idx >= 0) this.cache.students[idx] = s;
+        else this.cache.students.push(s);
       });
 
-      setLocal('students', merged);
       return matching;
     } catch (err) {
       console.warn('Error fetching students from Firestore:', err);
-    }
-    return [];
-  }
-
-  private async syncWithFirestore() {
-    if (!db || typeof window === 'undefined') return;
-    try {
-      const collectionsToSync = [
-        'centers',
-        'users',
-        'students',
-        'attendance',
-        'monthlyFees',
-        'feePayments',
-        'expenses',
-        'donations',
-        'exams',
-        'examMarks',
-        'donatedContacts',
-      ];
-
-      for (const collName of collectionsToSync) {
-        try {
-          const snap = await getDocs(collection(db, collName));
-          const localItems = getLocal<any[]>(collName, []);
-          const firestoreItems: any[] = [];
-          if (!snap.empty) {
-            snap.forEach((d) => firestoreItems.push(d.data()));
-          }
-
-          // 1. Inbound: Merge Firestore items into local storage
-          const merged = [...localItems];
-          firestoreItems.forEach((fi) => {
-            const idField = fi.id ? 'id' : fi.uid ? 'uid' : null;
-            if (idField) {
-              const idx = merged.findIndex((m) => m[idField] === fi[idField]);
-              if (idx >= 0) {
-                const localTime = new Date(merged[idx].updatedAt || 0).getTime();
-                const cloudTime = new Date(fi.updatedAt || 0).getTime();
-                if (cloudTime >= localTime) {
-                  merged[idx] = fi;
-                }
-              } else {
-                merged.push(fi);
-              }
-            } else {
-              merged.push(fi);
-            }
-          });
-          setLocal(collName, merged);
-
-          // 2. Outbound: Push any local items missing in Firestore up to Firestore
-          for (const item of merged) {
-            const idField = item.id ? 'id' : item.uid ? 'uid' : null;
-            if (idField && item[idField]) {
-              const inCloud = firestoreItems.some((fi) => fi[idField] === item[idField]);
-              if (!inCloud) {
-                await this.syncDocToFirestore(collName, item[idField], item);
-              }
-            }
-          }
-        } catch (innerErr) {
-          console.warn(`Error syncing collection ${collName}:`, innerErr);
-        }
-      }
-    } catch (err) {
-      console.warn('Background Firestore sync (local-first fallback active):', err);
+      return [];
     }
   }
 
   // AUDIT LOG
   public logAudit(action: string, details: string, performedBy: string, centerId?: string) {
-    const logs = getLocal<AuditLog[]>('auditLogs', []);
     const newLog: AuditLog = {
       id: 'log-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
       centerId,
@@ -360,79 +262,97 @@ class DataService {
       performedBy,
       timestamp: new Date().toISOString(),
     };
-    logs.unshift(newLog);
-    setLocal('auditLogs', logs.slice(0, 500)); // Keep latest 500
+    this.cache.auditLogs.unshift(newLog);
+    this.syncDocToFirestore('auditLogs', newLog.id, newLog);
   }
 
   public getAuditLogs(centerId?: string): AuditLog[] {
     this.init();
-    const logs = getLocal<AuditLog[]>('auditLogs', []);
     if (centerId) {
-      return logs.filter(l => !l.centerId || l.centerId === centerId);
+      return this.cache.auditLogs.filter((l) => !l.centerId || l.centerId === centerId);
     }
-    return logs;
+    return this.cache.auditLogs;
   }
 
   // SETTINGS
   public getSettings(): SystemSettings {
     this.init();
-    return getLocal<SystemSettings>('settings', DEFAULT_SETTINGS);
+    return this.cache.settings;
   }
 
   public updateSettings(settings: Partial<SystemSettings>): SystemSettings {
     this.init();
-    const current = this.getSettings();
-    const updated = { ...current, ...settings };
-    setLocal('settings', updated);
-    return updated;
+    this.cache.settings = { ...this.cache.settings, ...settings };
+    this.syncDocToFirestore('settings', 'global', this.cache.settings);
+    return this.cache.settings;
   }
 
   // USERS & AUTH
   public getUsers(): AdminUser[] {
     this.init();
-    return getLocal<AdminUser[]>('users', []);
+    return this.cache.users;
   }
 
   public getUserByPhone(phone: string): AdminUser | undefined {
     this.init();
     const norm = normalizePhoneNumber(phone);
-    return this.getUsers().find(u => normalizePhoneNumber(u.phone) === norm);
+    return this.cache.users.find((u) => normalizePhoneNumber(u.phone) === norm);
   }
 
   public saveUser(user: AdminUser): void {
     this.init();
-    const users = this.getUsers();
     const normPhone = normalizePhoneNumber(user.phone);
     const pin = user.passwordPin || getDefaultPassword(normPhone);
-    const idx = users.findIndex(u => u.uid === user.uid || normalizePhoneNumber(u.phone) === normPhone);
+    const idx = this.cache.users.findIndex(
+      (u) => u.uid === user.uid || normalizePhoneNumber(u.phone) === normPhone
+    );
     let saved: AdminUser;
     if (idx >= 0) {
-      saved = { ...users[idx], ...user, phone: normPhone, passwordPin: pin, updatedAt: new Date().toISOString() };
-      users[idx] = saved;
+      saved = { ...this.cache.users[idx], ...user, phone: normPhone, passwordPin: pin, updatedAt: new Date().toISOString() };
+      this.cache.users[idx] = saved;
     } else {
       saved = { ...user, phone: normPhone, passwordPin: pin, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
-      users.push(saved);
+      this.cache.users.push(saved);
     }
-    setLocal('users', users);
     this.syncDocToFirestore('users', saved.uid, saved);
   }
 
   public updateUserPassword(phone: string, newPasswordPlain: string): boolean {
     this.init();
-    const users = this.getUsers();
     const norm = normalizePhoneNumber(phone);
-    const user = users.find(u => normalizePhoneNumber(u.phone) === norm);
+    const user = this.cache.users.find((u) => normalizePhoneNumber(u.phone) === norm);
     if (!user) return false;
 
     user.passwordPin = newPasswordPlain;
     user.mustChangePassword = false;
     user.updatedAt = new Date().toISOString();
-    setLocal('users', users);
     this.syncDocToFirestore('users', user.uid, user);
-
-    // Save custom password locally
-    setLocal(`pwd_${norm}`, newPasswordPlain);
     this.logAudit('Password Changed', `User ${user.phone} (${user.role}) changed their 4-digit PIN`, user.name);
+    return true;
+  }
+
+  public updateSuperAdminCredentials(newPhone: string, newPin?: string, newName?: string): boolean {
+    this.init();
+    const normPhone = normalizePhoneNumber(newPhone);
+    const superAdmin = this.cache.users.find((u) => u.role === 'SUPER_ADMIN');
+    if (!superAdmin) return false;
+
+    superAdmin.phone = normPhone;
+    if (newPin && newPin.length === 4) {
+      superAdmin.passwordPin = newPin;
+    }
+    if (newName) {
+      superAdmin.name = newName;
+    }
+    superAdmin.updatedAt = new Date().toISOString();
+
+    // Update settings superAdminPhone
+    this.cache.settings.superAdminPhone = normPhone;
+    this.syncDocToFirestore('settings', 'global', this.cache.settings);
+
+    // Save user in Firestore
+    this.syncDocToFirestore('users', superAdmin.uid, superAdmin);
+    this.logAudit('Super Admin Updated', `Super Admin contact/credentials updated to ${normPhone}`, 'Super Admin');
     return true;
   }
 
@@ -442,298 +362,409 @@ class DataService {
     const user = this.getUserByPhone(norm);
     if (!user || !user.isActive) return false;
 
-    // 1. Direct passwordPin property on user
     if (user.passwordPin) {
       return user.passwordPin === passwordInput;
     }
-
-    // 2. Local custom PIN
-    const savedCustom = getLocal<string | null>(`pwd_${norm}`, null);
-    if (savedCustom) {
-      return savedCustom === passwordInput;
-    }
-
-    // 3. Default password rule: last 4 digits of normalized phone
     const defaultPwd = getDefaultPassword(norm);
     return passwordInput === defaultPwd;
   }
 
   public resetUserPassword(phone: string, performedBy: string): boolean {
-    this.init();
     const norm = normalizePhoneNumber(phone);
-    const users = this.getUsers();
-    const user = users.find(u => normalizePhoneNumber(u.phone) === norm);
+    const user = this.getUserByPhone(norm);
     if (!user) return false;
 
     const defaultPin = getDefaultPassword(norm);
     user.passwordPin = defaultPin;
     user.mustChangePassword = true;
     user.updatedAt = new Date().toISOString();
-    setLocal('users', users);
     this.syncDocToFirestore('users', user.uid, user);
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem(getKey(`pwd_${norm}`));
-    }
     this.logAudit('Password Reset', `Password for ${user.phone} reset to default last 4 digits PIN by ${performedBy}`, performedBy);
     return true;
   }
 
+  public deleteUser(userId: string): { success: boolean; error?: string } {
+    this.init();
+    const user = this.cache.users.find((u) => u.uid === userId);
+    if (!user) return { success: false, error: 'User not found.' };
+
+    if (user.role === 'SUPER_ADMIN') {
+      const allSuperAdmins = this.cache.users.filter((u) => u.role === 'SUPER_ADMIN');
+      if (allSuperAdmins.length <= 1) {
+        return {
+          success: false,
+          error: 'The primary Super Admin account cannot be deleted unless another Super Admin is added first.',
+        };
+      }
+    }
+
+    this.cache.users = this.cache.users.filter((u) => u.uid !== userId);
+    this.deleteDocFromFirestore('users', userId);
+
+    // Remove user phone from any assigned center's admin list
+    this.cache.centers.forEach((c) => {
+      if (c.adminPhones.includes(user.phone)) {
+        c.adminPhones = c.adminPhones.filter((p) => p !== user.phone);
+        this.syncDocToFirestore('centers', c.id, c);
+      }
+    });
+
+    this.logAudit('Administrator Deleted', `Administrator ${user.name} (${user.phone}) deleted`, 'Super Admin');
+    return { success: true };
+  }
+
   public updateAdminProfile(phone: string, updates: { name: string; place?: string }): AdminUser | null {
     this.init();
-    const users = this.getUsers();
     const norm = normalizePhoneNumber(phone);
-    const user = users.find(u => normalizePhoneNumber(u.phone) === norm);
+    const user = this.cache.users.find((u) => normalizePhoneNumber(u.phone) === norm);
     if (!user) return null;
+
     user.name = updates.name;
     if (updates.place !== undefined) user.place = updates.place;
     user.updatedAt = new Date().toISOString();
-    setLocal('users', users);
     this.syncDocToFirestore('users', user.uid, user);
-    this.logAudit('Admin Profile Updated', `Admin details updated for ${phone}`, user.name);
+    this.logAudit('Profile Updated', `Admin profile updated for ${user.phone}`, user.name);
     return user;
   }
 
-  public deleteUser(uid: string, performedBy?: string): boolean {
+  // FACULTIES
+  public getFaculties(status?: FacultyStatus): Faculty[] {
     this.init();
-    const users = this.getUsers();
-    const user = users.find(u => u.uid === uid);
-    if (!user) return false;
+    if (status) {
+      return this.cache.faculties.filter((f) => f.status === status);
+    }
+    return this.cache.faculties;
+  }
 
-    // Disallow deleting the primary super administrator
-    if (user.role === 'SUPER_ADMIN') {
-      const superAdmins = users.filter(u => u.role === 'SUPER_ADMIN');
-      if (superAdmins.length <= 1) {
-        throw new Error('Cannot delete the primary Super Administrator account.');
+  public getFacultyById(id: string): Faculty | undefined {
+    this.init();
+    return this.cache.faculties.find((f) => f.id === id);
+  }
+
+  public saveFaculty(facultyData: Partial<Faculty>, performedBy: string = 'Super Admin'): Faculty {
+    this.init();
+    const now = new Date().toISOString();
+    let saved: Faculty;
+
+    if (facultyData.id) {
+      const idx = this.cache.faculties.findIndex((f) => f.id === facultyData.id);
+      if (idx >= 0) {
+        saved = {
+          ...this.cache.faculties[idx],
+          ...facultyData,
+          phone: normalizePhoneNumber(facultyData.phone || this.cache.faculties[idx].phone),
+          updatedAt: now,
+        } as Faculty;
+        this.cache.faculties[idx] = saved;
+      } else {
+        saved = {
+          id: facultyData.id,
+          name: facultyData.name || 'Faculty Member',
+          phone: normalizePhoneNumber(facultyData.phone || ''),
+          place: facultyData.place || '',
+          qualification: facultyData.qualification || '',
+          status: facultyData.status || 'Approved',
+          assignedCenterIds: facultyData.assignedCenterIds || [],
+          notes: facultyData.notes || '',
+          createdAt: now,
+          updatedAt: now,
+        };
+        this.cache.faculties.push(saved);
       }
+    } else {
+      const id = 'fac-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 6);
+      saved = {
+        id,
+        name: facultyData.name || 'Faculty Member',
+        phone: normalizePhoneNumber(facultyData.phone || ''),
+        place: facultyData.place || '',
+        qualification: facultyData.qualification || '',
+        status: facultyData.status || 'Approved',
+        assignedCenterIds: facultyData.assignedCenterIds || [],
+        notes: facultyData.notes || '',
+        createdAt: now,
+        updatedAt: now,
+      };
+      this.cache.faculties.push(saved);
     }
 
-    const remainingUsers = users.filter(u => u.uid !== uid);
-    setLocal('users', remainingUsers);
-    this.deleteDocFromFirestore('users', uid);
+    this.syncDocToFirestore('faculties', saved.id, saved);
+    this.logAudit('Faculty Saved', `Faculty ${saved.name} (${saved.phone}) saved by ${performedBy}`, performedBy);
+    return saved;
+  }
 
-    // Also remove admin phone from any centers' adminPhones list
-    const centers = this.getCenters();
-    let centersChanged = false;
-    centers.forEach(c => {
-      if (c.adminPhones && c.adminPhones.includes(user.phone)) {
-        c.adminPhones = c.adminPhones.filter(p => p !== user.phone);
-        this.syncDocToFirestore('centers', c.id, c);
-        centersChanged = true;
-      }
-    });
-    if (centersChanged) {
-      setLocal('centers', centers);
-    }
+  public approveFaculty(facultyId: string, performedBy: string = 'Super Admin'): boolean {
+    this.init();
+    const faculty = this.cache.faculties.find((f) => f.id === facultyId);
+    if (!faculty) return false;
 
-    // Clean up stored password if any
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem(getKey(`pwd_${normalizePhoneNumber(user.phone)}`));
-    }
-
-    this.logAudit('Administrator Deleted', `Administrator ${user.name} (${user.phone}) deleted by ${performedBy || 'Super Admin'}`, performedBy || 'Super Admin');
+    faculty.status = 'Approved';
+    faculty.updatedAt = new Date().toISOString();
+    this.syncDocToFirestore('faculties', faculty.id, faculty);
+    this.logAudit('Faculty Approved', `Faculty ${faculty.name} approved by ${performedBy}`, performedBy);
     return true;
   }
 
-  public registerCenterWithAdmin(params: {
-    centerData: Partial<Center> & { name: string; place: string };
-    adminPhone: string;
-    adminPasswordPlain: string;
-    adminName: string;
-    adminPlace?: string;
-  }): { center: Center; admin: AdminUser } {
+  public deleteFaculty(facultyId: string, performedBy: string = 'Super Admin'): boolean {
     this.init();
-    const normPhone = normalizePhoneNumber(params.adminPhone);
-    const savedCenter = this.saveCenter({
-      ...params.centerData,
-      adminPhones: [normPhone],
-    });
+    const faculty = this.cache.faculties.find((f) => f.id === facultyId);
+    if (!faculty) return false;
 
-    let admin = this.getUserByPhone(normPhone);
-    if (admin) {
-      if (!admin.centerIds.includes(savedCenter.id)) {
-        admin.centerIds.push(savedCenter.id);
-      }
-      admin.name = params.adminName || admin.name;
-      if (params.adminPlace) admin.place = params.adminPlace;
-      if (params.adminPasswordPlain) admin.passwordPin = params.adminPasswordPlain;
-      this.saveUser(admin);
-    } else {
-      admin = {
-        uid: 'admin-' + Date.now().toString(36),
-        phone: normPhone,
-        name: params.adminName,
-        place: params.adminPlace,
-        role: 'CENTER_ADMIN',
-        centerIds: [savedCenter.id],
-        passwordPin: params.adminPasswordPlain || getDefaultPassword(normPhone),
-        mustChangePassword: false, // Explicitly set password initially
-        isActive: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      this.saveUser(admin);
-    }
-
-    if (params.adminPasswordPlain) {
-      setLocal(`pwd_${normPhone}`, params.adminPasswordPlain);
-    }
-
-    this.logAudit(
-      'Center Registered with Admin',
-      `Center ${savedCenter.name} registered with Admin ${admin.name} (${normPhone})`,
-      admin.name,
-      savedCenter.id
-    );
-
-    return { center: savedCenter, admin };
+    this.cache.faculties = this.cache.faculties.filter((f) => f.id !== facultyId);
+    this.deleteDocFromFirestore('faculties', facultyId);
+    this.logAudit('Faculty Deleted', `Faculty ${faculty.name} removed by ${performedBy}`, performedBy);
+    return true;
   }
 
   // CENTERS
   public getCenters(): Center[] {
     this.init();
-    return getLocal<Center[]>('centers', []);
+    return this.cache.centers;
   }
 
   public getCenterById(id: string): Center | undefined {
-    return this.getCenters().find(c => c.id === id);
+    this.init();
+    return this.cache.centers.find((c) => c.id === id);
   }
 
-  public saveCenter(centerData: Partial<Center> & { name: string; place: string }): Center {
+  public saveCenter(center: Partial<Center> & { id?: string }): Center {
     this.init();
-    const centers = this.getCenters();
-    const settings = this.getSettings();
+    const now = new Date().toISOString();
+    let target: Center;
 
-    let center: Center;
-    if (centerData.id) {
-      const idx = centers.findIndex(c => c.id === centerData.id);
+    if (center.id) {
+      const idx = this.cache.centers.findIndex((c) => c.id === center.id);
       if (idx >= 0) {
-        center = { ...centers[idx], ...centerData, updatedAt: new Date().toISOString() };
-        centers[idx] = center;
+        target = {
+          ...this.cache.centers[idx],
+          ...center,
+          updatedAt: now,
+        } as Center;
+        this.cache.centers[idx] = target;
       } else {
-        center = centerData as Center;
-        centers.push(center);
+        target = {
+          name: center.name || 'CRE Centre',
+          place: center.place || '',
+          state: center.state || 'Kerala',
+          district: center.district || 'Malappuram',
+          zoneOrUnit: center.zoneOrUnit || 'Unit',
+          regularDay: center.regularDay || 'Sunday',
+          startTime: center.startTime || '09:00',
+          endTime: center.endTime || '12:00',
+          effectiveDate: center.effectiveDate || now.split('T')[0],
+          examMode: center.examMode || 'semester',
+          contactNumbers: center.contactNumbers || [],
+          defaultFee: center.defaultFee || 100,
+          status: center.status || 'Active',
+          adminPhones: center.adminPhones || [],
+          createdAt: now,
+          updatedAt: now,
+          ...center,
+          id: center.id,
+        } as Center;
+        this.cache.centers.push(target);
       }
     } else {
-      // New Center
       const newId = 'center-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 5);
-      const defaultStatus = settings.newCenterApprovalMode === 'automatic' ? 'Active' : 'Pending Approval';
-      center = {
+      target = {
+        name: center.name || 'CRE Centre',
+        place: center.place || '',
+        state: center.state || 'Kerala',
+        district: center.district || 'Malappuram',
+        zoneOrUnit: center.zoneOrUnit || 'Unit',
+        regularDay: center.regularDay || 'Sunday',
+        startTime: center.startTime || '09:00',
+        endTime: center.endTime || '12:00',
+        effectiveDate: center.effectiveDate || now.split('T')[0],
+        examMode: center.examMode || 'semester',
+        contactNumbers: center.contactNumbers || [],
+        defaultFee: center.defaultFee || 100,
+        status: center.status || 'Active',
+        adminPhones: center.adminPhones || [],
+        createdAt: now,
+        updatedAt: now,
+        ...center,
         id: newId,
-        name: centerData.name,
-        place: centerData.place,
-        landmark: centerData.landmark || '',
-        state: centerData.state || 'Kerala',
-        district: centerData.district || 'Malappuram West',
-        otherStateName: centerData.otherStateName,
-        otherDistrictName: centerData.otherDistrictName,
-        zoneOrUnit: centerData.zoneOrUnit || 'Zone',
-        zoneName: centerData.zoneName || '',
-        unitName: centerData.unitName || '',
-        regularDay: centerData.regularDay || 'Sunday',
-        startTime: centerData.startTime || '09:00',
-        endTime: centerData.endTime || '11:30',
-        effectiveDate: centerData.effectiveDate || new Date().toISOString().split('T')[0],
-        facultyName: centerData.facultyName || '',
-        contactNumbers: centerData.contactNumbers || [],
-        status: centerData.status || defaultStatus,
-        defaultFee: centerData.defaultFee ?? 100,
-        examMode: centerData.examMode || 'semester',
-        adminPhones: centerData.adminPhones || [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      centers.push(center);
+      } as Center;
+      this.cache.centers.push(target);
     }
-    setLocal('centers', centers);
-    this.syncDocToFirestore('centers', center.id, center);
-    this.logAudit('Center Saved', `Center ${center.name} (${center.id}) saved with status ${center.status}`, 'Admin', center.id);
-    return center;
+
+    this.syncDocToFirestore('centers', target.id, target);
+    this.logAudit('Center Saved', `Center ${target.name} (${target.place}) updated/created`, 'Admin', target.id);
+    return target;
   }
 
-  public deleteCenter(centerId: string, permanent = false): boolean {
+  public deleteCenter(centerId: string, permanent: boolean = false): boolean {
     this.init();
-    const centers = this.getCenters();
-    const idx = centers.findIndex(c => c.id === centerId);
-    if (idx < 0) return false;
+    const center = this.getCenterById(centerId);
+    if (!center) return false;
 
     if (permanent) {
-      centers.splice(idx, 1);
+      this.cache.centers = this.cache.centers.filter((c) => c.id !== centerId);
       this.deleteDocFromFirestore('centers', centerId);
-      this.logAudit('Center Permanently Deleted', `Center ${centerId} permanently deleted`, 'Super Admin');
+      this.logAudit('Center Deleted', `Center ${center.name} permanently deleted`, 'Super Admin');
     } else {
-      centers[idx].status = 'Archived';
-      centers[idx].updatedAt = new Date().toISOString();
-      this.syncDocToFirestore('centers', centerId, centers[idx]);
-      this.logAudit('Center Archived', `Center ${centerId} archived`, 'Super Admin', centerId);
+      center.status = 'Archived';
+      center.updatedAt = new Date().toISOString();
+      this.syncDocToFirestore('centers', center.id, center);
+      this.logAudit('Center Archived', `Center ${center.name} archived`, 'Super Admin', centerId);
     }
-    setLocal('centers', centers);
     return true;
   }
 
-  public updateCenterStatus(centerId: string, status: Center['status']): boolean {
+  public updateCenterStatus(centerId: string, status: CenterStatus): boolean {
     this.init();
-    const centers = this.getCenters();
-    const center = centers.find(c => c.id === centerId);
+    const center = this.getCenterById(centerId);
     if (!center) return false;
     center.status = status;
     center.updatedAt = new Date().toISOString();
-    setLocal('centers', centers);
-    this.syncDocToFirestore('centers', centerId, center);
+    this.syncDocToFirestore('centers', center.id, center);
     this.logAudit('Center Status Changed', `Center ${center.name} status updated to ${status}`, 'Super Admin', centerId);
     return true;
+  }
+
+  public registerCenterWithAdmin(params: {
+    centerData: Omit<Center, 'id' | 'adminPhones' | 'createdAt' | 'updatedAt' | 'contactNumbers' | 'examMode' | 'effectiveDate'> & {
+      contactNumbers?: string[];
+      effectiveDate?: string;
+      examMode?: ExamMode;
+    };
+    adminPhone: string;
+    adminPasswordPlain?: string;
+    adminName?: string;
+    adminPlace?: string;
+  }): { center: Center; admin: AdminUser } {
+    this.init();
+    const centerId = 'center-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 5);
+    const cleanAdminPhone = normalizePhoneNumber(params.adminPhone);
+
+    const center: Center = {
+      ...params.centerData,
+      id: centerId,
+      contactNumbers: params.centerData.contactNumbers || [cleanAdminPhone],
+      effectiveDate: params.centerData.effectiveDate || new Date().toISOString().split('T')[0],
+      examMode: params.centerData.examMode || 'semester',
+      adminPhones: [cleanAdminPhone],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    let admin = this.getUserByPhone(cleanAdminPhone);
+    if (admin) {
+      if (!admin.centerIds.includes(centerId)) {
+        admin.centerIds.push(centerId);
+      }
+      admin.name = params.adminName || admin.name;
+      admin.place = params.adminPlace || admin.place || center.place;
+      if (params.adminPasswordPlain) admin.passwordPin = params.adminPasswordPlain;
+      admin.updatedAt = new Date().toISOString();
+    } else {
+      admin = {
+        uid: 'admin-' + Date.now().toString(36),
+        phone: cleanAdminPhone,
+        name: params.adminName || 'Centre Admin',
+        place: params.adminPlace || center.place,
+        role: 'CENTER_ADMIN',
+        centerIds: [centerId],
+        passwordPin: params.adminPasswordPlain || getDefaultPassword(cleanAdminPhone),
+        mustChangePassword: false,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      this.cache.users.push(admin);
+    }
+
+    this.cache.centers.push(center);
+    this.syncDocToFirestore('centers', center.id, center);
+    this.syncDocToFirestore('users', admin.uid, admin);
+
+    this.logAudit(
+      'Center Registered',
+      `New centre ${center.name} registered with Admin ${admin.name} (${admin.phone})`,
+      'System',
+      centerId
+    );
+
+    return { center, admin };
   }
 
   // STUDENTS
   public getStudents(centerId?: string): Student[] {
     this.init();
-    const list = getLocal<Student[]>('students', []);
-    if (centerId) return list.filter(s => s.centerId === centerId);
-    return list;
+    if (centerId && centerId !== 'ALL') {
+      return this.cache.students.filter((s) => s.centerId === centerId);
+    }
+    return this.cache.students;
   }
 
-  public getStudentById(studentId: string): Student | undefined {
+  public getStudentById(id: string): Student | undefined {
     this.init();
-    return this.getStudents().find(s => s.id === studentId);
+    return this.cache.students.find((s) => s.id === id);
   }
 
   public getStudentsByPhone(phone: string): Student[] {
     this.init();
-    const norm = normalizePhoneNumber(phone);
-    if (!norm) return [];
-    return this.getStudents().filter(s => {
-      const pPhone = normalizePhoneNumber(s.parentPhone || '');
-      const sPhone = normalizePhoneNumber(s.studentPhone || '');
-      return pPhone === norm || sPhone === norm;
+    const clean = normalizePhoneNumber(phone);
+    return this.cache.students.filter((s) => {
+      const p = normalizePhoneNumber(s.parentPhone || '');
+      const sp = normalizePhoneNumber(s.studentPhone || '');
+      return p === clean || sp === clean;
     });
   }
 
   public generateAdmissionNumber(centerId: string): string {
-    const students = this.getStudents(centerId);
-    const count = students.length + 1;
-    const center = this.getCenterById(centerId);
-    const code = center ? center.name.replace(/[^a-zA-Z]/g, '').substring(0, 3).toUpperCase() : 'CRE';
-    return `CRE-${code}-${String(count).padStart(3, '0')}`;
+    const centerStudents = this.getStudents(centerId);
+    let nextNum = centerStudents.length + 1;
+    let candidate = `CRE-${String(nextNum).padStart(3, '0')}`;
+    while (centerStudents.some((s) => s.admissionNumber === candidate)) {
+      nextNum++;
+      candidate = `CRE-${String(nextNum).padStart(3, '0')}`;
+    }
+    return candidate;
   }
 
-  public saveStudent(studentData: Partial<Student> & { centerId: string; name: string }): Student {
+  public saveStudent(studentData: Partial<Student> & { centerId: string; name: string }, performedBy: string = 'Admin'): Student {
     this.init();
-    const students = this.getStudents();
+    const center = this.getCenterById(studentData.centerId);
+    const now = new Date().toISOString();
     let student: Student;
 
     if (studentData.id) {
-      const idx = students.findIndex(s => s.id === studentData.id);
+      const idx = this.cache.students.findIndex((s) => s.id === studentData.id);
       if (idx >= 0) {
-        student = { ...students[idx], ...studentData, updatedAt: new Date().toISOString() };
-        students[idx] = student;
+        student = {
+          ...this.cache.students[idx],
+          ...studentData,
+          gender: studentData.gender || this.cache.students[idx].gender || 'Boy',
+          studentPhone: studentData.studentPhone ? normalizePhoneNumber(studentData.studentPhone) : '',
+          parentPhone: studentData.parentPhone ? normalizePhoneNumber(studentData.parentPhone) : '',
+          updatedAt: now,
+        };
+        this.cache.students[idx] = student;
       } else {
-        student = studentData as Student;
-        students.push(student);
+        student = {
+          id: studentData.id,
+          centerId: studentData.centerId,
+          admissionNumber: studentData.admissionNumber || this.generateAdmissionNumber(studentData.centerId),
+          name: studentData.name,
+          gender: studentData.gender || 'Boy',
+          parentName: studentData.parentName || '',
+          studentPhone: studentData.studentPhone ? normalizePhoneNumber(studentData.studentPhone) : '',
+          parentPhone: studentData.parentPhone ? normalizePhoneNumber(studentData.parentPhone) : '',
+          place: studentData.place || '',
+          admissionDate: studentData.admissionDate || now.split('T')[0],
+          defaultFee: studentData.defaultFee ?? (center?.defaultFee ?? 100),
+          status: studentData.status || 'Active',
+          createdAt: now,
+          updatedAt: now,
+        };
+        this.cache.students.push(student);
       }
     } else {
-      const center = this.getCenterById(studentData.centerId);
-      const newId = 'std-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 5);
+      const id = 'std-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 5);
       student = {
-        id: newId,
+        id,
         centerId: studentData.centerId,
         admissionNumber: studentData.admissionNumber || this.generateAdmissionNumber(studentData.centerId),
         name: studentData.name,
@@ -742,40 +773,36 @@ class DataService {
         studentPhone: studentData.studentPhone ? normalizePhoneNumber(studentData.studentPhone) : '',
         parentPhone: studentData.parentPhone ? normalizePhoneNumber(studentData.parentPhone) : '',
         place: studentData.place || '',
-        admissionDate: studentData.admissionDate || new Date().toISOString().split('T')[0],
+        admissionDate: studentData.admissionDate || now.split('T')[0],
         defaultFee: studentData.defaultFee ?? (center?.defaultFee ?? 100),
         status: studentData.status || 'Active',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: now,
+        updatedAt: now,
       };
-      students.push(student);
+      this.cache.students.push(student);
     }
-    setLocal('students', students);
+
     this.syncDocToFirestore('students', student.id, student);
-    this.logAudit('Student Saved', `Student ${student.name} (${student.admissionNumber}) saved`, 'Admin', student.centerId);
+    this.logAudit('Student Saved', `Student ${student.name} (${student.admissionNumber}) saved by ${performedBy}`, performedBy, student.centerId);
     return student;
   }
 
-  public setStudentStatus(studentId: string, status: 'Active' | 'Inactive'): boolean {
+  public setStudentStatus(studentId: string, status: StudentStatus, performedBy: string = 'Admin'): boolean {
     this.init();
-    const students = this.getStudents();
-    const s = students.find(item => item.id === studentId);
+    const s = this.cache.students.find((item) => item.id === studentId);
     if (!s) return false;
     s.status = status;
     s.updatedAt = new Date().toISOString();
-    setLocal('students', students);
     this.syncDocToFirestore('students', s.id, s);
-    this.logAudit('Student Status Changed', `Student ${s.name} status updated to ${status}`, 'Admin', s.centerId);
+    this.logAudit('Student Status Changed', `Student ${s.name} status updated to ${status} by ${performedBy}`, performedBy, s.centerId);
     return true;
   }
 
   public deleteStudent(studentId: string, performedBy?: string): boolean {
     this.init();
-    const students = this.getStudents();
-    const s = students.find(item => item.id === studentId);
+    const s = this.cache.students.find((item) => item.id === studentId);
     if (!s) return false;
-    const remaining = students.filter(item => item.id !== studentId);
-    setLocal('students', remaining);
+    this.cache.students = this.cache.students.filter((item) => item.id !== studentId);
     this.deleteDocFromFirestore('students', studentId);
     this.logAudit(
       'Student Deleted',
@@ -789,18 +816,21 @@ class DataService {
   // ATTENDANCE
   public getAttendanceRecords(centerId: string, date?: string): AttendanceRecord[] {
     this.init();
-    const list = getLocal<AttendanceRecord[]>('attendance', []).filter(a => a.centerId === centerId);
-    if (date) return list.filter(a => a.date === date);
+    const list = this.cache.attendance.filter((a) => a.centerId === centerId);
+    if (date) return list.filter((a) => a.date === date);
     return list;
   }
 
-  public saveAttendance(centerId: string, date: string, records: Array<{ studentId: string; status: AttendanceStatus; remarks?: string }>, recordedBy: string): void {
+  public saveAttendance(
+    centerId: string,
+    date: string,
+    records: Array<{ studentId: string; status: AttendanceStatus; remarks?: string }>,
+    recordedBy: string
+  ): void {
     this.init();
-    let allRecords = getLocal<AttendanceRecord[]>('attendance', []);
-    // Remove existing records for this center and date (re-saving)
-    allRecords = allRecords.filter(a => !(a.centerId === centerId && a.date === date));
+    this.cache.attendance = this.cache.attendance.filter((a) => !(a.centerId === centerId && a.date === date));
 
-    const newRecords: AttendanceRecord[] = records.map(r => ({
+    const newRecords: AttendanceRecord[] = records.map((r) => ({
       id: `att-${centerId}-${date}-${r.studentId}`,
       centerId,
       date,
@@ -811,66 +841,107 @@ class DataService {
       recordedAt: new Date().toISOString(),
     }));
 
-    allRecords.push(...newRecords);
-    setLocal('attendance', allRecords);
-    newRecords.forEach(r => this.syncDocToFirestore('attendance', r.id, r));
-    this.logAudit('Attendance Saved', `Attendance for date ${date} saved (${newRecords.length} students)`, recordedBy, centerId);
+    this.cache.attendance.push(...newRecords);
+    newRecords.forEach((nr) => this.syncDocToFirestore('attendance', nr.id, nr));
+    this.logAudit('Attendance Recorded', `Attendance for ${date} (${newRecords.length} students) saved`, recordedBy, centerId);
   }
 
-  public calculateStudentAttendance(studentId: string, centerId: string, month?: string) {
-    const all = this.getAttendanceRecords(centerId).filter(a => {
-      if (a.studentId !== studentId) return false;
-      if (month && !a.date.startsWith(month)) return false;
-      return true;
-    });
-
-    // Total unique class dates conducted for this center
-    const allCenterRecords = this.getAttendanceRecords(centerId).filter(a => {
-      if (month && !a.date.startsWith(month)) return false;
-      return true;
-    });
-    const uniqueDates = Array.from(new Set(allCenterRecords.map(a => a.date)));
-    const totalConducted = uniqueDates.length;
-
-    const present = all.filter(a => a.status === 'Present').length;
-    const absent = all.filter(a => a.status === 'Absent').length;
-    const leave = all.filter(a => a.status === 'Leave').length;
-    const percentage = totalConducted > 0 ? Math.round((present / totalConducted) * 100) : 0;
-
-    return { totalConducted, present, absent, leave, percentage, records: all };
-  }
-
-  // MONTHLY FEES & PAYMENTS
-  public getMonthlyFees(centerId: string, month?: string): MonthlyFeeRecord[] {
+  public calculateStudentAttendance(studentId: string, centerId: string, month?: string): { totalConducted: number; present: number; absent: number; leave: number; percentage: number; records: AttendanceRecord[] } {
     this.init();
-    const list = getLocal<MonthlyFeeRecord[]>('monthlyFees', []).filter(f => f.centerId === centerId);
-    if (month) return list.filter(f => f.month === month);
-    return list;
+    let records = this.cache.attendance.filter((a) => a.centerId === centerId && a.studentId === studentId);
+    if (month) {
+      records = records.filter((a) => a.date.startsWith(month));
+    }
+    const centerAtt = this.cache.attendance.filter((a) => a.centerId === centerId);
+    const monthAtt = month ? centerAtt.filter((a) => a.date.startsWith(month)) : centerAtt;
+    const uniqueDates = Array.from(new Set(monthAtt.map((a) => a.date)));
+    const totalConducted = uniqueDates.length;
+    const present = records.filter((r) => r.status === 'Present').length;
+    const absent = records.filter((r) => r.status === 'Absent').length;
+    const leave = records.filter((r) => r.status === 'Leave').length;
+    const percentage = totalConducted > 0 ? Math.round((present / totalConducted) * 100) : 100;
+    return { totalConducted, present, absent, leave, percentage, records };
+  }
+
+  // FEES
+  public getMonthlyFees(centerId?: string, month?: string): MonthlyFeeRecord[] {
+    this.init();
+    const students = this.getStudents(centerId).filter((s) => s.status === 'Active');
+    const targetMonth = month || new Date().toISOString().slice(0, 7);
+
+    return students.map((st) => {
+      const existing = this.cache.monthlyFees.find(
+        (f) => f.studentId === st.id && f.month === targetMonth
+      );
+      if (existing) return existing;
+
+      const payments = this.cache.feePayments.filter(
+        (p) => p.studentId === st.id && p.month === targetMonth
+      );
+      const paidAmount = payments.reduce((acc, p) => acc + p.amount, 0);
+      const expectedFee = st.defaultFee;
+      let status: FeeStatus = 'Unpaid';
+      let outstandingAmount = 0;
+      let advanceCredit = 0;
+
+      if (paidAmount === 0) {
+        status = 'Unpaid';
+        outstandingAmount = expectedFee;
+      } else if (paidAmount < expectedFee) {
+        status = 'Partially Paid';
+        outstandingAmount = expectedFee - paidAmount;
+      } else if (paidAmount === expectedFee) {
+        status = 'Paid';
+        outstandingAmount = 0;
+      } else {
+        status = 'Advance / Excess';
+        advanceCredit = paidAmount - expectedFee;
+      }
+
+      return {
+        id: `fee-${st.centerId}-${targetMonth}-${st.id}`,
+        centerId: st.centerId,
+        studentId: st.id,
+        month: targetMonth,
+        expectedFee,
+        paidAmount,
+        outstandingAmount,
+        advanceCredit,
+        status,
+      };
+    });
+  }
+
+  public getMonthlyFeeRecord(centerId: string, studentId: string, month: string): MonthlyFeeRecord | undefined {
+    this.init();
+    return this.cache.monthlyFees.find((f) => f.centerId === centerId && f.studentId === studentId && f.month === month);
   }
 
   public getFeePayments(centerId?: string, month?: string): FeePayment[] {
     this.init();
-    let list = getLocal<FeePayment[]>('feePayments', []);
-    if (centerId) list = list.filter(p => p.centerId === centerId);
-    if (month) list = list.filter(p => p.month === month);
+    let list = this.cache.feePayments;
+    if (centerId && centerId !== 'ALL') {
+      list = list.filter((p) => p.centerId === centerId);
+    }
+    if (month) return list.filter((p) => p.month === month);
     return list;
   }
 
   public recordFeePayment(params: {
     centerId: string;
     studentId: string;
-    month: string; // YYYY-MM
+    month: string;
     amount: number;
     paymentDate: string;
     remarks?: string;
     recordedBy: string;
   }): FeePayment {
     this.init();
-    const payments = getLocal<FeePayment[]>('feePayments', []);
-    const paymentId = 'pay-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 5);
+    const student = this.getStudentById(params.studentId);
+    const expected = student ? student.defaultFee : 100;
 
     const payment: FeePayment = {
-      id: paymentId,
+      id: 'pay-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 5),
       centerId: params.centerId,
       studentId: params.studentId,
       month: params.month,
@@ -880,60 +951,57 @@ class DataService {
       recordedBy: params.recordedBy,
       createdAt: new Date().toISOString(),
     };
-    payments.unshift(payment);
-    setLocal('feePayments', payments);
+
+    this.cache.feePayments.push(payment);
     this.syncDocToFirestore('feePayments', payment.id, payment);
 
-    // Update or generate MonthlyFeeRecord
-    const student = this.getStudentById(params.studentId);
-    const expected = student?.defaultFee ?? 100;
-    const monthlyFees = getLocal<MonthlyFeeRecord[]>('monthlyFees', []);
-    const idx = monthlyFees.findIndex(m => m.centerId === params.centerId && m.studentId === params.studentId && m.month === params.month);
+    const existingPayments = this.cache.feePayments.filter(
+      (p) => p.centerId === params.centerId && p.studentId === params.studentId && p.month === params.month
+    );
+    const totalPaid = existingPayments.reduce((acc, cur) => acc + cur.amount, 0);
 
-    const prevPaid = idx >= 0 ? monthlyFees[idx].paidAmount : 0;
-    const totalPaid = prevPaid + params.amount;
-    const outstanding = Math.max(0, expected - totalPaid);
-    const advance = Math.max(0, totalPaid - expected);
+    let feeStatus: FeeStatus = 'Unpaid';
+    let outstanding = 0;
+    let advanceCredit = 0;
 
-    let status: FeeStatus = 'Unpaid';
-    if (totalPaid >= expected) {
-      status = advance > 0 ? 'Advance / Excess' : 'Paid';
-    } else if (totalPaid > 0) {
-      status = 'Partially Paid';
-    }
-
-    let updatedFeeRecord: MonthlyFeeRecord;
-    if (idx >= 0) {
-      updatedFeeRecord = {
-        ...monthlyFees[idx],
-        paidAmount: totalPaid,
-        outstandingAmount: outstanding,
-        advanceCredit: advance,
-        status,
-        lastPaymentDate: params.paymentDate,
-        remarks: params.remarks || monthlyFees[idx].remarks,
-      };
-      monthlyFees[idx] = updatedFeeRecord;
+    if (totalPaid === 0) {
+      feeStatus = 'Unpaid';
+      outstanding = expected;
+    } else if (totalPaid < expected) {
+      feeStatus = 'Partially Paid';
+      outstanding = expected - totalPaid;
+    } else if (totalPaid === expected) {
+      feeStatus = 'Paid';
+      outstanding = 0;
     } else {
-      updatedFeeRecord = {
-        id: `fee-${params.centerId}-${params.month}-${params.studentId}`,
-        centerId: params.centerId,
-        studentId: params.studentId,
-        month: params.month,
-        expectedFee: expected,
-        paidAmount: totalPaid,
-        outstandingAmount: outstanding,
-        advanceCredit: advance,
-        status,
-        lastPaymentDate: params.paymentDate,
-        remarks: params.remarks,
-      };
-      monthlyFees.push(updatedFeeRecord);
+      feeStatus = 'Advance / Excess';
+      advanceCredit = totalPaid - expected;
     }
-    setLocal('monthlyFees', monthlyFees);
-    this.syncDocToFirestore('monthlyFees', updatedFeeRecord.id, updatedFeeRecord);
 
-    this.logAudit('Fee Payment Recorded', `Payment of ₹${params.amount} recorded for student ${student?.name || params.studentId} for ${params.month}`, params.recordedBy, params.centerId);
+    const feeRecordId = `fee-${params.centerId}-${params.month}-${params.studentId}`;
+    const feeRecord: MonthlyFeeRecord = {
+      id: feeRecordId,
+      centerId: params.centerId,
+      studentId: params.studentId,
+      month: params.month,
+      expectedFee: expected,
+      paidAmount: totalPaid,
+      outstandingAmount: outstanding,
+      advanceCredit,
+      status: feeStatus,
+      lastPaymentDate: params.paymentDate,
+      remarks: params.remarks,
+    };
+
+    const feeIdx = this.cache.monthlyFees.findIndex((f) => f.id === feeRecordId);
+    if (feeIdx >= 0) {
+      this.cache.monthlyFees[feeIdx] = feeRecord;
+    } else {
+      this.cache.monthlyFees.push(feeRecord);
+    }
+    this.syncDocToFirestore('monthlyFees', feeRecord.id, feeRecord);
+
+    this.logAudit('Fee Payment Recorded', `Payment of ₹${params.amount} for ${student?.name || params.studentId} (${params.month})`, params.recordedBy, params.centerId);
     return payment;
   }
 
@@ -942,206 +1010,231 @@ class DataService {
     studentId: string;
     month: string;
     expectedFee: number;
-    status?: FeeStatus;
     remarks?: string;
-  }): void {
+  }): MonthlyFeeRecord {
     this.init();
-    const monthlyFees = getLocal<MonthlyFeeRecord[]>('monthlyFees', []);
-    const idx = monthlyFees.findIndex(m => m.centerId === params.centerId && m.studentId === params.studentId && m.month === params.month);
+    const feeRecordId = `fee-${params.centerId}-${params.month}-${params.studentId}`;
+    const payments = this.cache.feePayments.filter(
+      (p) => p.centerId === params.centerId && p.studentId === params.studentId && p.month === params.month
+    );
+    const paidAmount = payments.reduce((acc, p) => acc + p.amount, 0);
+    const expected = params.expectedFee;
 
-    let feeRec: MonthlyFeeRecord;
-    if (idx >= 0) {
-      const rec = monthlyFees[idx];
-      rec.expectedFee = params.expectedFee;
-      rec.outstandingAmount = Math.max(0, params.expectedFee - rec.paidAmount);
-      rec.advanceCredit = Math.max(0, rec.paidAmount - params.expectedFee);
-      if (params.status) rec.status = params.status;
-      if (params.remarks) rec.remarks = params.remarks;
-      feeRec = rec;
+    let feeStatus: FeeStatus = 'Unpaid';
+    let outstanding = 0;
+    let advanceCredit = 0;
+
+    if (paidAmount === 0) {
+      feeStatus = 'Unpaid';
+      outstanding = expected;
+    } else if (paidAmount < expected) {
+      feeStatus = 'Partially Paid';
+      outstanding = expected - paidAmount;
+    } else if (paidAmount === expected) {
+      feeStatus = 'Paid';
+      outstanding = 0;
     } else {
-      feeRec = {
-        id: `fee-${params.centerId}-${params.month}-${params.studentId}`,
-        centerId: params.centerId,
-        studentId: params.studentId,
-        month: params.month,
-        expectedFee: params.expectedFee,
-        paidAmount: 0,
-        outstandingAmount: params.expectedFee,
-        advanceCredit: 0,
-        status: params.status || 'Unpaid',
-        remarks: params.remarks,
-      };
-      monthlyFees.push(feeRec);
+      feeStatus = 'Advance / Excess';
+      advanceCredit = paidAmount - expected;
     }
-    setLocal('monthlyFees', monthlyFees);
-    this.syncDocToFirestore('monthlyFees', feeRec.id, feeRec);
+
+    const feeRecord: MonthlyFeeRecord = {
+      id: feeRecordId,
+      centerId: params.centerId,
+      studentId: params.studentId,
+      month: params.month,
+      expectedFee: expected,
+      paidAmount,
+      outstandingAmount: outstanding,
+      advanceCredit,
+      status: feeStatus,
+      remarks: params.remarks,
+    };
+
+    const idx = this.cache.monthlyFees.findIndex((f) => f.id === feeRecordId);
+    if (idx >= 0) {
+      this.cache.monthlyFees[idx] = { ...this.cache.monthlyFees[idx], ...feeRecord };
+    } else {
+      this.cache.monthlyFees.push(feeRecord);
+    }
+
+    this.syncDocToFirestore('monthlyFees', feeRecordId, feeRecord);
+    this.logAudit('Fee Adjusted', `Monthly expected fee adjusted to ₹${expected} for ${params.studentId}`, 'Admin', params.centerId);
+    return feeRecord;
   }
 
-  // DONATIONS
+  // DONATIONS & EXPENSES
   public getDonations(centerId?: string, month?: string): Donation[] {
     this.init();
-    let list = getLocal<Donation[]>('donations', []);
-    if (centerId) list = list.filter(d => d.centerId === centerId);
-    if (month) list = list.filter(d => d.date.startsWith(month));
+    let list = this.cache.donations;
+    if (centerId && centerId !== 'ALL') {
+      list = list.filter((d) => d.centerId === centerId);
+    }
+    if (month) {
+      list = list.filter((d) => d.date.startsWith(month));
+    }
     return list;
   }
 
-  public addDonation(params: Omit<Donation, 'id' | 'createdAt'>): Donation {
+  public saveDonation(donationData: Omit<Donation, 'id' | 'createdAt'>): Donation {
     this.init();
-    const donations = getLocal<Donation[]>('donations', []);
-    const newDonation: Donation = {
+    const donation: Donation = {
+      ...donationData,
       id: 'don-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 5),
-      ...params,
       createdAt: new Date().toISOString(),
     };
-    donations.unshift(newDonation);
-    setLocal('donations', donations);
-    this.syncDocToFirestore('donations', newDonation.id, newDonation);
-    this.logAudit('Donation Added', `Donation of ₹${newDonation.amount} recorded from ${newDonation.donorName || 'Anonymous'}`, newDonation.recordedBy, newDonation.centerId);
-    return newDonation;
+    this.cache.donations.push(donation);
+    this.syncDocToFirestore('donations', donation.id, donation);
+    this.logAudit('Donation Recorded', `Donation of ₹${donation.amount} received from ${donation.donorName || 'Well-wisher'}`, donation.recordedBy, donation.centerId);
+    return donation;
   }
 
-  // EXPENSES
+  public addDonation(donationData: Omit<Donation, 'id' | 'createdAt'>): Donation {
+    return this.saveDonation(donationData);
+  }
+
   public getExpenses(centerId?: string, month?: string): Expense[] {
     this.init();
-    let list = getLocal<Expense[]>('expenses', []);
-    if (centerId) list = list.filter(e => e.centerId === centerId);
-    if (month) list = list.filter(e => e.date.startsWith(month));
+    let list = this.cache.expenses;
+    if (centerId && centerId !== 'ALL') {
+      list = list.filter((e) => e.centerId === centerId);
+    }
+    if (month) {
+      list = list.filter((e) => e.date.startsWith(month));
+    }
     return list;
   }
 
-  public addExpense(params: Omit<Expense, 'id' | 'createdAt'>): Expense {
+  public saveExpense(expenseData: Omit<Expense, 'id' | 'createdAt'>): Expense {
     this.init();
-    const expenses = getLocal<Expense[]>('expenses', []);
-    const newExpense: Expense = {
+    const expense: Expense = {
+      ...expenseData,
       id: 'exp-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 5),
-      ...params,
       createdAt: new Date().toISOString(),
     };
-    expenses.unshift(newExpense);
-    setLocal('expenses', expenses);
-    this.syncDocToFirestore('expenses', newExpense.id, newExpense);
-    this.logAudit('Expense Recorded', `Expense ₹${newExpense.amount} (${newExpense.category}) recorded`, newExpense.recordedBy, newExpense.centerId);
-    return newExpense;
+    this.cache.expenses.push(expense);
+    this.syncDocToFirestore('expenses', expense.id, expense);
+    this.logAudit('Expense Recorded', `Expense ₹${expense.amount} under category ${expense.category}`, expense.recordedBy, expense.centerId);
+    return expense;
   }
 
-  public deleteExpense(expenseId: string, performedBy: string): boolean {
+  public addExpense(expenseData: Omit<Expense, 'id' | 'createdAt'>): Expense {
+    return this.saveExpense(expenseData);
+  }
+
+  public deleteExpense(expenseId: string, recordedBy: string = 'Admin'): boolean {
     this.init();
-    const expenses = getLocal<Expense[]>('expenses', []);
-    const idx = expenses.findIndex(e => e.id === expenseId);
-    if (idx < 0) return false;
-    const removed = expenses.splice(idx, 1)[0];
-    setLocal('expenses', expenses);
+    const exp = this.cache.expenses.find((e) => e.id === expenseId);
+    if (!exp) return false;
+    this.cache.expenses = this.cache.expenses.filter((e) => e.id !== expenseId);
     this.deleteDocFromFirestore('expenses', expenseId);
-    this.logAudit('Expense Deleted', `Expense of ₹${removed.amount} (${removed.category}) deleted`, performedBy, removed.centerId);
+    this.logAudit('Expense Deleted', `Expense of ₹${exp.amount} deleted`, recordedBy, exp.centerId);
     return true;
   }
 
-  // FINANCIAL SUMMARY CALCULATIONS
-  public getFinancialSummary(centerId?: string, month?: string) {
-    const feePayments = this.getFeePayments(centerId, month);
-    const totalFeeIncome = feePayments.reduce((acc, p) => acc + (p.amount || 0), 0);
+  public getFinancialSummary(centerId?: string, month?: string): {
+    totalFees: number;
+    totalDonations: number;
+    totalIncome: number;
+    totalExpenses: number;
+    balance: number;
+    totalFeeIncome: number;
+    totalDonationIncome: number;
+    totalWeeklyExpense: number;
+    totalOtherExpense: number;
+    netBalance: number;
+  } {
+    this.init();
+    const fees = (centerId && centerId !== 'ALL'
+      ? this.getFeePayments(centerId, month)
+      : this.cache.feePayments.filter((p) => !month || p.month === month)
+    ).reduce((a, b) => a + b.amount, 0);
 
-    const donations = this.getDonations(centerId, month);
-    const totalDonationIncome = donations.reduce((acc, d) => acc + (d.amount || 0), 0);
-
-    const totalIncome = totalFeeIncome + totalDonationIncome;
-
-    const expenses = this.getExpenses(centerId, month);
-    const weeklyExpenses = expenses.filter(e => e.type === 'weekly');
-    const otherExpenses = expenses.filter(e => e.type === 'other');
-
-    const totalWeeklyExpense = weeklyExpenses.reduce((acc, e) => acc + (e.amount || 0), 0);
-    const totalOtherExpense = otherExpenses.reduce((acc, e) => acc + (e.amount || 0), 0);
-    const totalExpenses = totalWeeklyExpense + totalOtherExpense;
-
-    const netBalance = totalIncome - totalExpenses;
-
+    const donations = this.getDonations(centerId, month).reduce((a, b) => a + b.amount, 0);
+    const allExpenses = this.getExpenses(centerId, month);
+    const expenses = allExpenses.reduce((a, b) => a + b.amount, 0);
+    const weeklyExp = allExpenses.filter((e) => e.type === 'weekly').reduce((a, b) => a + b.amount, 0);
+    const otherExp = allExpenses.filter((e) => e.type === 'other').reduce((a, b) => a + b.amount, 0);
+    const totalIncome = fees + donations;
+    const balance = totalIncome - expenses;
     return {
-      totalFeeIncome,
-      totalDonationIncome,
+      totalFees: fees,
+      totalDonations: donations,
       totalIncome,
-      totalWeeklyExpense,
-      totalOtherExpense,
-      totalExpenses,
-      netBalance,
+      totalExpenses: expenses,
+      balance,
+      totalFeeIncome: fees,
+      totalDonationIncome: donations,
+      totalWeeklyExpense: weeklyExp,
+      totalOtherExpense: otherExp,
+      netBalance: balance,
     };
   }
 
-  // EXAMINATIONS
-  public getExams(centerId: string): Exam[] {
+  public getExams(centerId?: string): Exam[] {
     this.init();
-    return getLocal<Exam[]>('exams', []).filter(e => e.centerId === centerId);
+    if (centerId && centerId !== 'ALL') {
+      return this.cache.exams.filter((e) => e.centerId === centerId);
+    }
+    return this.cache.exams;
   }
 
-  public getExamById(examId: string): Exam | undefined {
+  public getExamById(id: string): Exam | undefined {
     this.init();
-    return getLocal<Exam[]>('exams', []).find(e => e.id === examId);
+    return this.cache.exams.find((e) => e.id === id);
   }
 
-  public saveExam(examData: Partial<Exam> & { centerId: string; name: string; date: string }): Exam {
+  public saveExam(examData: Omit<Exam, 'id' | 'createdAt'> & { id?: string }): Exam {
     this.init();
-    const exams = getLocal<Exam[]>('exams', []);
+    const now = new Date().toISOString();
     let exam: Exam;
-
     if (examData.id) {
-      const idx = exams.findIndex(e => e.id === examData.id);
+      const idx = this.cache.exams.findIndex((e) => e.id === examData.id);
       if (idx >= 0) {
-        exam = { ...exams[idx], ...examData };
-        exams[idx] = exam;
+        exam = { ...this.cache.exams[idx], ...examData };
+        this.cache.exams[idx] = exam;
       } else {
-        exam = examData as Exam;
-        exams.push(exam);
+        exam = { ...examData, id: examData.id, createdAt: now };
+        this.cache.exams.push(exam);
       }
     } else {
-      const newId = 'exam-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 5);
       exam = {
-        id: newId,
-        centerId: examData.centerId,
-        name: examData.name,
-        mode: examData.mode || 'semester',
-        semesterName: examData.semesterName,
-        portion: examData.portion,
-        date: examData.date,
-        subjects: examData.subjects || [],
-        createdAt: new Date().toISOString(),
+        ...examData,
+        id: 'exam-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 5),
+        createdAt: now,
       };
-      exams.push(exam);
+      this.cache.exams.push(exam);
     }
-    setLocal('exams', exams);
     this.syncDocToFirestore('exams', exam.id, exam);
-    this.logAudit('Exam Saved', `Exam ${exam.name} saved for center ${exam.centerId}`, 'Admin', exam.centerId);
+    this.logAudit('Exam Saved', `Exam ${exam.name} scheduled for ${exam.date}`, 'Admin', exam.centerId);
     return exam;
   }
 
-  public deleteExam(examId: string, performedBy: string): boolean {
+  public deleteExam(examId: string): boolean {
     this.init();
-    const exams = getLocal<Exam[]>('exams', []);
-    const idx = exams.findIndex(e => e.id === examId);
-    if (idx < 0) return false;
-    const removed = exams.splice(idx, 1)[0];
-    setLocal('exams', exams);
+    const exam = this.cache.exams.find((e) => e.id === examId);
+    if (!exam) return false;
+    this.cache.exams = this.cache.exams.filter((e) => e.id !== examId);
     this.deleteDocFromFirestore('exams', examId);
-    this.logAudit('Exam Deleted', `Exam ${removed.name} deleted`, performedBy, removed.centerId);
+    this.cache.examMarks = this.cache.examMarks.filter((m) => m.examId !== examId);
+    this.logAudit('Exam Deleted', `Exam ${exam.name} deleted`, 'Admin', exam.centerId);
     return true;
   }
 
   public getExamMarks(centerId: string, examId?: string, studentId?: string): ExamMark[] {
     this.init();
-    let marks = getLocal<ExamMark[]>('examMarks', []).filter(m => m.centerId === centerId);
-    if (examId) marks = marks.filter(m => m.examId === examId);
-    if (studentId) marks = marks.filter(m => m.studentId === studentId);
-    return marks;
+    let list = this.cache.examMarks.filter((m) => m.centerId === centerId);
+    if (examId) list = list.filter((m) => m.examId === examId);
+    if (studentId) list = list.filter((m) => m.studentId === studentId);
+    return list;
   }
 
-  public saveExamMarks(centerId: string, examId: string, marksList: Array<{ subjectId: string; studentId: string; marksObtained: number; maxMarks: number; isPassed: boolean; remarks?: string }>): void {
+  public saveExamMarks(centerId: string, examId: string, marks: Array<{ studentId: string; subjectId: string; marksObtained: number; maxMarks: number; isPassed: boolean; remarks?: string }>, recordedBy: string = 'Admin'): void {
     this.init();
-    let allMarks = getLocal<ExamMark[]>('examMarks', []);
-    // Remove existing marks for this exam and replace
-    allMarks = allMarks.filter(m => !(m.centerId === centerId && m.examId === examId));
+    this.cache.examMarks = this.cache.examMarks.filter((m) => !(m.centerId === centerId && m.examId === examId));
 
-    const newMarks: ExamMark[] = marksList.map(m => ({
-      id: `mark-${examId}-${m.subjectId}-${m.studentId}`,
+    const newMarks: ExamMark[] = marks.map((m) => ({
+      id: `mark-${examId}-${m.studentId}-${m.subjectId}`,
       centerId,
       examId,
       subjectId: m.subjectId,
@@ -1153,97 +1246,69 @@ class DataService {
       enteredAt: new Date().toISOString(),
     }));
 
-    allMarks.push(...newMarks);
-    setLocal('examMarks', allMarks);
-    newMarks.forEach(m => this.syncDocToFirestore('examMarks', m.id, m));
-    this.logAudit('Exam Marks Recorded', `Marks recorded for exam ${examId} (${newMarks.length} records)`, 'Admin', centerId);
+    this.cache.examMarks.push(...newMarks);
+    newMarks.forEach((nm) => this.syncDocToFirestore('examMarks', nm.id, nm));
+    this.logAudit('Exam Marks Recorded', `Marks recorded for exam ${examId}`, recordedBy, centerId);
   }
 
   // DONATED CONTACTS
   public getDonatedContacts(centerId?: string): DonatedContact[] {
     this.init();
-    const list = getLocal<DonatedContact[]>('donatedContacts', []);
-    if (centerId) return list.filter(c => c.centerId === centerId);
-    return list;
+    if (centerId && centerId !== 'ALL') {
+      return this.cache.donatedContacts.filter((c) => c.centerId === centerId);
+    }
+    return this.cache.donatedContacts;
   }
 
-  public addDonatedContact(params: {
-    centerId: string;
-    name: string;
-    phone: string;
-    place: string;
-    remarks?: string;
-    submittedByStudentId?: string;
-  }): { success: boolean; contact?: DonatedContact; warningDuplicate?: boolean } {
+  public saveDonatedContact(contactData: Omit<DonatedContact, 'id' | 'createdAt' | 'updatedAt' | 'status'> & { status?: ContactStatus }): { success: boolean; contact?: DonatedContact; error?: string; warningDuplicate?: boolean } {
     this.init();
-    const normPhone = normalizePhoneNumber(params.phone);
-    const existing = this.getDonatedContacts(params.centerId);
-    const isDuplicate = existing.some(c => normalizePhoneNumber(c.phone) === normPhone);
+    const cleanPhone = normalizePhoneNumber(contactData.phone);
+    const existing = this.cache.donatedContacts.find((c) => normalizePhoneNumber(c.phone) === cleanPhone);
+    const warningDuplicate = !!existing;
 
-    const contacts = getLocal<DonatedContact[]>('donatedContacts', []);
-    const newContact: DonatedContact = {
+    const contact: DonatedContact = {
+      ...contactData,
+      status: contactData.status || 'New',
+      phone: cleanPhone,
       id: 'dc-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 5),
-      centerId: params.centerId,
-      name: params.name,
-      phone: normPhone,
-      place: params.place,
-      remarks: params.remarks,
-      status: 'New',
-      submittedByStudentId: params.submittedByStudentId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    contacts.unshift(newContact);
-    setLocal('donatedContacts', contacts);
-    this.syncDocToFirestore('donatedContacts', newContact.id, newContact);
-    this.logAudit('Contact Donated', `New admission lead ${newContact.name} (${newContact.phone}) submitted`, 'User', newContact.centerId);
-
-    return { success: true, contact: newContact, warningDuplicate: isDuplicate };
+    this.cache.donatedContacts.push(contact);
+    this.syncDocToFirestore('donatedContacts', contact.id, contact);
+    return { success: true, contact, warningDuplicate };
   }
 
-  public updateDonatedContactStatus(contactId: string, status: ContactStatus, performedBy: string): boolean {
+  public addDonatedContact(contactData: Omit<DonatedContact, 'id' | 'createdAt' | 'updatedAt' | 'status'> & { status?: ContactStatus }): { success: boolean; contact?: DonatedContact; error?: string; warningDuplicate?: boolean } {
+    return this.saveDonatedContact(contactData);
+  }
+
+  public updateContactStatus(contactId: string, status: ContactStatus): boolean {
     this.init();
-    const contacts = getLocal<DonatedContact[]>('donatedContacts', []);
-    const c = contacts.find(item => item.id === contactId);
-    if (!c) return false;
-    c.status = status;
-    c.updatedAt = new Date().toISOString();
-    setLocal('donatedContacts', contacts);
-    this.syncDocToFirestore('donatedContacts', c.id, c);
-    this.logAudit('Contact Status Updated', `Lead ${c.name} status updated to ${status}`, performedBy, c.centerId);
+    const contact = this.cache.donatedContacts.find((c) => c.id === contactId);
+    if (!contact) return false;
+    contact.status = status;
+    contact.updatedAt = new Date().toISOString();
+    this.syncDocToFirestore('donatedContacts', contact.id, contact);
     return true;
   }
 
-  public deleteDonatedContact(contactId: string, performedBy: string): boolean {
+  public updateDonatedContactStatus(contactId: string, status: ContactStatus, performedBy: string = 'Super Admin'): boolean {
+    const res = this.updateContactStatus(contactId, status);
+    if (res) {
+      this.logAudit('Contact Status Updated', `Donated contact status changed to ${status}`, performedBy);
+    }
+    return res;
+  }
+
+  public deleteDonatedContact(contactId: string, performedBy: string = 'Super Admin'): boolean {
     this.init();
-    const contacts = getLocal<DonatedContact[]>('donatedContacts', []);
-    const idx = contacts.findIndex(c => c.id === contactId);
-    if (idx < 0) return false;
-    const removed = contacts.splice(idx, 1)[0];
-    setLocal('donatedContacts', contacts);
+    const contact = this.cache.donatedContacts.find((c) => c.id === contactId);
+    if (!contact) return false;
+    this.cache.donatedContacts = this.cache.donatedContacts.filter((c) => c.id !== contactId);
     this.deleteDocFromFirestore('donatedContacts', contactId);
-    this.logAudit('Contact Deleted', `Lead ${removed.name} deleted`, performedBy, removed.centerId);
+    this.logAudit('Contact Deleted', `Donated contact ${contact.name} deleted`, performedBy);
     return true;
-  }
-
-  // EXPORT / BACKUP
-  public exportData(centerId?: string) {
-    this.init();
-    const dump = {
-      exportDate: new Date().toISOString(),
-      centerId: centerId || 'ALL',
-      centers: centerId ? this.getCenters().filter(c => c.id === centerId) : this.getCenters(),
-      students: this.getStudents(centerId),
-      attendance: centerId ? this.getAttendanceRecords(centerId) : getLocal<AttendanceRecord[]>('attendance', []),
-      feePayments: this.getFeePayments(centerId),
-      monthlyFees: centerId ? this.getMonthlyFees(centerId) : getLocal<MonthlyFeeRecord[]>('monthlyFees', []),
-      donations: this.getDonations(centerId),
-      expenses: this.getExpenses(centerId),
-      exams: centerId ? this.getExams(centerId) : getLocal<Exam[]>('exams', []),
-      examMarks: centerId ? this.getExamMarks(centerId) : getLocal<ExamMark[]>('examMarks', []),
-      donatedContacts: this.getDonatedContacts(centerId),
-    };
-    return dump;
   }
 }
 

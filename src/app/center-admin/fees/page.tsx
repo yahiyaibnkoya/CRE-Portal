@@ -264,6 +264,7 @@ export default function CenterAdminFeesPage() {
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 border-b border-cre-border text-[11px] font-bold text-cre-navy uppercase tracking-wider">
                 <tr>
+                  <th className="py-3.5 px-4">#</th>
                   <th className="py-3.5 px-4">Adm No</th>
                   <th className="py-3.5 px-4">Student Name</th>
                   <th className="py-3.5 px-4">Expected Fee</th>
@@ -275,8 +276,11 @@ export default function CenterAdminFeesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-cre-border">
-                {filteredRows.map((r) => (
+                {filteredRows.map((r, idx) => (
                   <tr key={r.student.id} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="py-3.5 px-4 font-bold text-slate-400">
+                      {idx + 1}
+                    </td>
                     <td className="py-3.5 px-4 font-mono font-bold text-cre-navy">
                       {r.student.admissionNumber}
                     </td>
@@ -347,7 +351,7 @@ export default function CenterAdminFeesPage() {
 
                 {filteredRows.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-xs text-slate-400">
+                    <td colSpan={9} className="py-8 text-center text-xs text-slate-400">
                       No fee records found for current filter.
                     </td>
                   </tr>

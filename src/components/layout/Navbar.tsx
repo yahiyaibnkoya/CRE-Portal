@@ -4,18 +4,18 @@ import React, { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import {
   LogOut,
   Building,
   User,
   Menu,
   X,
-  Lock,
-  MapPin,
   Phone,
   CheckCircle2,
   Edit2,
   Save,
+  Users,
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -28,10 +28,12 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileMenu, isMobileMenu
     role,
     adminUser,
     selectedStudent,
+    associatedStudents,
     activeCenter,
     availableCenters,
     setActiveCenterId,
     logout,
+    switchStudentSession,
     updateCurrentAdminProfile,
   } = useAuth();
 
@@ -40,6 +42,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileMenu, isMobileMenu
   const [profileName, setProfileName] = useState(adminUser?.name || '');
   const [profilePlace, setProfilePlace] = useState(adminUser?.place || '');
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const handleOpenProfileModal = () => {
     setProfileName(adminUser?.name || '');
@@ -102,32 +105,39 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileMenu, isMobileMenu
             </Link>
           </div>
 
-          {/* Right: Center Selector, User Info, Profile, Logout */}
-          <div className="flex items-center space-x-2 sm:space-x-4">
-            {/* Center Selector for Admins if multiple centers */}
-            {role === 'SUPER_ADMIN' || (role === 'CENTER_ADMIN' && availableCenters.length > 1) ? (
-              <div className="hidden sm:flex items-center space-x-2 bg-cre-navy-light px-3 py-1.5 rounded-lg border border-cre-navy/10 text-xs text-cre-navy font-medium">
-                <Building className="w-4 h-4 text-cre-navy" />
+          {/* Center: Active Centre Selector (For multi-centre admins) */}
+          <div className="flex items-center space-x-2">
+            {role && role !== 'STUDENT' && availableCenters.length > 1 && (
+              <div className="flex items-center bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 text-xs">
+                <Building className="w-3.5 h-3.5 text-cre-green mr-1.5 shrink-0" />
+                <span className="text-slate-500 mr-1.5 hidden sm:inline text-[11px] font-medium">Centre:</span>
                 <select
                   value={activeCenter?.id || ''}
                   onChange={(e) => setActiveCenterId(e.target.value)}
-                  className="bg-transparent text-cre-navy font-semibold focus:outline-hidden cursor-pointer"
+                  className="bg-transparent font-bold text-cre-navy border-none focus:ring-0 p-0 text-xs cursor-pointer outline-hidden"
                 >
                   {availableCenters.map((c) => (
-                    <option key={c.id} value={c.id} className="text-slate-800 bg-white">
-                      {c.name}
+                    <option key={c.id} value={c.id}>
+                      {c.name} ({c.place})
                     </option>
                   ))}
                 </select>
               </div>
-            ) : activeCenter && role ? (
-              <div className="hidden sm:flex items-center space-x-1.5 px-3 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-700">
-                <Building className="w-3.5 h-3.5 text-cre-navy" />
-                <span className="truncate max-w-[160px]">{activeCenter.name}</span>
-              </div>
-            ) : null}
+            )}
 
-            {/* Role & User Badge */}
+            {role && availableCenters.length === 1 && activeCenter && (
+              <div className="hidden sm:flex items-center space-x-1.5 px-3 py-1 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+                <Building className="w-3.5 h-3.5 text-cre-green shrink-0" />
+                <span className="font-bold text-cre-navy truncate max-w-[180px]">
+                  {activeCenter.name}
+                </span>
+                <span className="text-[10px] text-slate-500">({activeCenter.place})</span>
+              </div>
+            )}
+          </div>
+
+          {/* Right: User Information & Logout */}
+          <div className="flex items-center space-x-3">
             {role ? (
               <div className="flex items-center space-x-2 sm:space-x-3">
                 {/* Clickable Profile Info for Admins */}
@@ -168,10 +178,10 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileMenu, isMobileMenu
                   </div>
                 )}
 
-                {/* Logout Button */}
+                {/* Logout Button with Confirmation */}
                 <button
                   type="button"
-                  onClick={logout}
+                  onClick={() => setShowLogoutConfirm(true)}
                   className="flex items-center space-x-1 text-slate-600 hover:text-red-600 hover:bg-red-50 p-1.5 sm:px-2.5 sm:py-1.5 rounded-md text-xs font-medium transition-colors"
                   title="Log out"
                 >
@@ -190,6 +200,44 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileMenu, isMobileMenu
           </div>
         </div>
       </div>
+
+      {/* MULTI-CHILD SWITCHING BAR FOR STUDENT PORTAL */}
+      {role === 'STUDENT' && associatedStudents.length > 1 && (
+        <div className="bg-cre-navy-light border-t border-cre-navy/10 px-3 sm:px-6 py-2">
+          <div className="max-w-7xl mx-auto flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center space-x-2 text-xs font-bold text-cre-navy">
+              <Users className="w-4 h-4 text-cre-green shrink-0" />
+              <span>Switch Student Profile:</span>
+            </div>
+            <div className="flex items-center space-x-2 overflow-x-auto py-0.5">
+              {associatedStudents.map((st) => {
+                const isCurrent = selectedStudent?.id === st.id;
+                return (
+                  <button
+                    key={st.id}
+                    type="button"
+                    onClick={() => switchStudentSession(st)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all flex items-center space-x-1.5 shrink-0 ${
+                      isCurrent
+                        ? 'bg-cre-green text-white shadow-xs'
+                        : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+                    }`}
+                  >
+                    <span>{st.name}</span>
+                    <span
+                      className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                        isCurrent ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+                      }`}
+                    >
+                      {st.admissionNumber}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ADMIN DETAILS EDIT MODAL */}
       {isProfileModalOpen && (
@@ -220,7 +268,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileMenu, isMobileMenu
             )}
 
             <form onSubmit={handleSaveProfile} className="space-y-4">
-              {/* Name */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   Administrator Full Name *
@@ -240,7 +287,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileMenu, isMobileMenu
                 </div>
               </div>
 
-              {/* Phone (Already logged in number) */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   Mobile Number (Already Logged-In)
@@ -252,34 +298,23 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileMenu, isMobileMenu
                   <input
                     type="tel"
                     disabled
-                    readOnly
                     value={adminUser?.phone || ''}
-                    className="block w-full pl-9 pr-8 py-2 text-xs font-bold border border-slate-200 rounded-xl bg-slate-100 text-slate-600 cursor-not-allowed"
+                    className="block w-full pl-9 pr-3 py-2 text-xs font-mono font-semibold bg-slate-100 border border-slate-200 rounded-xl text-slate-500 cursor-not-allowed"
                   />
-                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-400">
-                    <Lock className="w-3.5 h-3.5" />
-                  </div>
                 </div>
-                <span className="text-[10px] text-slate-400 mt-1 block">
-                  This is your registered account mobile number
-                </span>
               </div>
 
-              {/* Place */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Place / City
+                  Place / Locality
                 </label>
                 <div className="relative rounded-xl shadow-xs">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                    <MapPin className="w-4 h-4" />
-                  </div>
                   <input
                     type="text"
                     value={profilePlace}
                     onChange={(e) => setProfilePlace(e.target.value)}
                     placeholder="e.g. Manjeri"
-                    className="block w-full pl-9 pr-3 py-2 text-xs font-semibold border border-cre-border rounded-xl focus:ring-2 focus:ring-cre-green outline-hidden"
+                    className="block w-full px-3 py-2 text-xs font-semibold border border-cre-border rounded-xl focus:ring-2 focus:ring-cre-green outline-hidden"
                   />
                 </div>
               </div>
@@ -304,6 +339,20 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileMenu, isMobileMenu
           </div>
         </div>
       )}
+
+      {/* CONFIRM LOGOUT MODAL */}
+      <ConfirmModal
+        isOpen={showLogoutConfirm}
+        title="Confirm Sign Out"
+        message="Are you sure you want to log out of the portal? You will need your login credentials to sign in again."
+        confirmText="Yes, Logout"
+        isDanger={true}
+        onConfirm={() => {
+          setShowLogoutConfirm(false);
+          logout();
+        }}
+        onClose={() => setShowLogoutConfirm(false)}
+      />
     </header>
   );
 };

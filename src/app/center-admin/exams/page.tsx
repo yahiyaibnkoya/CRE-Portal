@@ -133,7 +133,7 @@ export default function CenterAdminExamsPage() {
 
   const handleConfirmDeleteExam = () => {
     if (!deleteExamId) return;
-    dataService.deleteExam(deleteExamId, 'Centre Admin');
+    dataService.deleteExam(deleteExamId);
     setDeleteExamId(null);
     refreshData();
   };
@@ -183,7 +183,7 @@ export default function CenterAdminExamsPage() {
       });
     });
 
-    dataService.saveExamMarks(centerId, currentExam.id, marksList);
+    dataService.saveExamMarks(centerId, currentExam.id, marksList, 'Centre Admin');
     setSaveMarksSuccess(true);
     setTimeout(() => setSaveMarksSuccess(false), 3000);
     refreshData();
@@ -251,16 +251,21 @@ export default function CenterAdminExamsPage() {
 
             {/* Exams Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {exams.map((exam) => (
+              {exams.map((exam, idx) => (
                 <div
                   key={exam.id}
                   className="bg-white rounded-2xl border border-cre-border shadow-xs hover:shadow-md transition-all flex flex-col justify-between p-5"
                 >
                   <div>
                     <div className="flex items-start justify-between gap-2 mb-2">
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cre-navy-light text-cre-navy border border-cre-navy/15">
-                        {exam.mode === 'semester' ? exam.semesterName : 'Non-Semester / Portions'}
-                      </span>
+                      <div className="flex items-center space-x-1.5">
+                        <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 border border-slate-200">
+                          #{idx + 1}
+                        </span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cre-navy-light text-cre-navy border border-cre-navy/15">
+                          {exam.mode === 'semester' ? exam.semesterName : 'Non-Semester / Portions'}
+                        </span>
+                      </div>
                       <span className="text-[10px] text-slate-400 font-mono">{exam.date}</span>
                     </div>
 
@@ -360,6 +365,7 @@ export default function CenterAdminExamsPage() {
                   <table className="w-full text-left text-xs">
                     <thead className="bg-slate-50 border-b border-cre-border text-[11px] font-bold text-cre-navy uppercase tracking-wider">
                       <tr>
+                        <th className="py-3.5 px-4">#</th>
                         <th className="py-3.5 px-4">Adm No</th>
                         <th className="py-3.5 px-4">Student Name</th>
                         {currentExam.subjects.map((sub) => (
@@ -374,7 +380,7 @@ export default function CenterAdminExamsPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-cre-border">
-                      {activeStudents.map((st) => {
+                      {activeStudents.map((st, idx) => {
                         let totalObtained = 0;
                         let totalMax = 0;
                         let allPassed = true;
@@ -391,6 +397,9 @@ export default function CenterAdminExamsPage() {
 
                         return (
                           <tr key={st.id} className="hover:bg-slate-50">
+                            <td className="py-3.5 px-4 font-bold text-slate-400">
+                              {idx + 1}
+                            </td>
                             <td className="py-3.5 px-4 font-mono font-bold text-cre-navy">
                               {st.admissionNumber}
                             </td>

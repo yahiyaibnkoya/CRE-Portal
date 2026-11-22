@@ -260,28 +260,38 @@ export default function CenterAdminFinancePage() {
             </div>
 
             <div className="divide-y divide-cre-border max-h-96 overflow-y-auto">
-              {feePayments.map((p) => {
+              {feePayments.map((p, idx) => {
                 const st = dataService.getStudentById(p.studentId);
                 return (
                   <div key={p.id} className="p-3.5 flex items-center justify-between hover:bg-slate-50 text-xs">
-                    <div>
-                      <span className="font-bold text-slate-900 block">{st?.name}</span>
-                      <span className="text-[10px] text-slate-400">
-                        Date: {p.paymentDate} • Monthly Fee • {p.remarks || 'Cash'}
+                    <div className="flex items-center space-x-2.5">
+                      <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 shrink-0">
+                        #{idx + 1}
                       </span>
+                      <div>
+                        <span className="font-bold text-slate-900 block">{st?.name}</span>
+                        <span className="text-[10px] text-slate-400">
+                          Date: {p.paymentDate} • Monthly Fee • {p.remarks || 'Cash'}
+                        </span>
+                      </div>
                     </div>
                     <span className="font-bold text-cre-green">+{formatCurrency(p.amount)}</span>
                   </div>
                 );
               })}
 
-              {donations.map((d) => (
+              {donations.map((d, idx) => (
                 <div key={d.id} className="p-3.5 flex items-center justify-between hover:bg-slate-50 text-xs bg-amber-50/20">
-                  <div>
-                    <span className="font-bold text-cre-navy block">Donation: {d.donorName}</span>
-                    <span className="text-[10px] text-slate-400">
-                      Date: {d.date} • {d.remarks || 'General Donation'}
+                  <div className="flex items-center space-x-2.5">
+                    <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-amber-100/70 text-amber-700 shrink-0">
+                      #{feePayments.length + idx + 1}
                     </span>
+                    <div>
+                      <span className="font-bold text-cre-navy block">Donation: {d.donorName}</span>
+                      <span className="text-[10px] text-slate-400">
+                        Date: {d.date} • {d.remarks || 'General Donation'}
+                      </span>
+                    </div>
                   </div>
                   <span className="font-bold text-cre-navy">+{formatCurrency(d.amount)}</span>
                 </div>
@@ -309,20 +319,25 @@ export default function CenterAdminFinancePage() {
             </div>
 
             <div className="divide-y divide-cre-border max-h-96 overflow-y-auto">
-              {expenses.map((e) => (
+              {expenses.map((e, idx) => (
                 <div key={e.id} className="p-3.5 flex items-center justify-between hover:bg-slate-50 text-xs group">
-                  <div>
-                    <div className="flex items-center space-x-1.5">
-                      <span className="font-bold text-slate-900">
-                        {e.category} {e.title ? `– ${e.title}` : ''}
-                      </span>
-                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium">
-                        {e.type}
+                  <div className="flex items-center space-x-2.5">
+                    <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 shrink-0">
+                      #{idx + 1}
+                    </span>
+                    <div>
+                      <div className="flex items-center space-x-1.5">
+                        <span className="font-bold text-slate-900">
+                          {e.category} {e.title ? `– ${e.title}` : ''}
+                        </span>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium">
+                          {e.type}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 block mt-0.5">
+                        Date: {e.date} • {e.description || 'Session Expense'}
                       </span>
                     </div>
-                    <span className="text-[10px] text-slate-400 block mt-0.5">
-                      Date: {e.date} • {e.description || 'Session Expense'}
-                    </span>
                   </div>
 
                   <div className="flex items-center space-x-3">

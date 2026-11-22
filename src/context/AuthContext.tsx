@@ -10,6 +10,7 @@ interface AuthContextType {
   role: UserRole | null;
   adminUser: AdminUser | null;
   selectedStudent: Student | null;
+  associatedStudents: Student[];
   activeCenterId: string | null;
   activeCenter: Center | null;
   availableCenters: Center[];
@@ -17,10 +18,12 @@ interface AuthContextType {
   loginAdmin: (phone: string, passwordPlain: string) => Promise<{ success: boolean; role?: UserRole; error?: string; mustChangePassword?: boolean }>;
   loginStudentPhone: (phone: string) => Promise<{ success: boolean; students?: Student[]; error?: string }>;
   selectStudentSession: (student: Student) => void;
+  switchStudentSession: (student: Student) => void;
   setActiveCenterId: (centerId: string) => void;
   logout: () => void;
   completePasswordChange: (newPassword: string) => Promise<{ success: boolean; error?: string }>;
   updateCurrentAdminProfile: (arg1: string | { name: string; place?: string }, arg2?: string) => boolean;
+  updateSuperAdminPhoneAndPin: (newPhone: string, newPin?: string, newName?: string, newPlace?: string) => Promise<boolean>;
   refreshData: () => void;
 }
 
@@ -33,22 +36,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [role, setRole] = useState<UserRole | null>(null);
   const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [associatedStudents, setAssociatedStudents] = useState<Student[]>([]);
   const [activeCenterId, setActiveCenterIdState] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [dataVersion, setDataVersion] = useState(0);
 
   const refreshData = () => setDataVersion((v) => v + 1);
 
-  // Restore session from localStorage on mount
+  // Restore session on mount from pure Firestore database
   useEffect(() => {
-    dataService.init();
-    try {
-      const savedRole = localStorage.getItem('cre_auth_role') as UserRole | null;
-      if (savedRole === 'SUPER_ADMIN' || savedRole === 'CENTER_ADMIN') {
+    let isMounted = true;
+    const restoreSession = async () => {
+      try {
+        await dataService.ensureSynced();
+
+        const savedRole = localStorage.getItem('cre_auth_role') as UserRole | null;
         const savedPhone = localStorage.getItem('cre_auth_phone');
-        if (savedPhone) {
-          const user = dataService.getUserByPhone(savedPhone);
-          if (user && user.isActive) {
+
+        if ((savedRole === 'SUPER_ADMIN' || savedRole === 'CENTER_ADMIN') && savedPhone) {
+          let user = dataService.getUserByPhone(savedPhone);
+          if (!user) {
+            user = (await dataService.fetchUserFromFirestore(savedPhone)) || undefined;
+          }
+
+          if (user && user.isActive && isMounted) {
             setRole(user.role);
             setAdminUser(user);
             const savedCenter = localStorage.getItem('cre_auth_center');
@@ -58,47 +69,53 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               setActiveCenterIdState(user.centerIds[0]);
             }
           }
-        }
-      } else if (savedRole === 'STUDENT') {
-        const savedStudentId = localStorage.getItem('cre_auth_student_id');
-        if (savedStudentId) {
-          const st = dataService.getStudentById(savedStudentId);
-          if (st) {
+        } else if (savedRole === 'STUDENT' && savedPhone) {
+          let matches = dataService.getStudentsByPhone(savedPhone);
+          if (matches.length === 0) {
+            matches = await dataService.fetchStudentsFromFirestore(savedPhone);
+          }
+          if (isMounted) setAssociatedStudents(matches);
+
+          const savedStudentId = localStorage.getItem('cre_auth_student_id');
+          const st = matches.find((s) => s.id === savedStudentId) || matches[0];
+          if (st && isMounted) {
             setRole('STUDENT');
             setSelectedStudent(st);
             setActiveCenterIdState(st.centerId);
           }
         }
+      } catch (e) {
+        console.error('Session restoration error:', e);
+      } finally {
+        if (isMounted) setIsLoading(false);
       }
-    } catch (e) {
-      console.error('Session restoration error', e);
-    } finally {
-      setIsLoading(false);
-    }
+    };
+
+    restoreSession();
+    return () => {
+      isMounted = false;
+    };
   }, [dataVersion]);
 
-  // Route protection
+  // Route protection using replace to prevent back button loops
   useEffect(() => {
     if (isLoading) return;
 
-    // Protect Super Admin routes
     if (pathname?.startsWith('/super-admin')) {
       if (role !== 'SUPER_ADMIN') {
-        router.push('/login?tab=admin');
+        router.replace('/login?tab=admin');
       }
     }
 
-    // Protect Center Admin routes
     if (pathname?.startsWith('/center-admin')) {
       if (role !== 'CENTER_ADMIN' && role !== 'SUPER_ADMIN') {
-        router.push('/login?tab=admin');
+        router.replace('/login?tab=admin');
       }
     }
 
-    // Protect Student routes
     if (pathname?.startsWith('/student')) {
       if (role !== 'STUDENT') {
-        router.push('/login?tab=student');
+        router.replace('/login?tab=student');
       }
     }
   }, [role, adminUser, pathname, isLoading, router]);
@@ -131,10 +148,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const loginAdmin = async (phone: string, passwordPlain: string) => {
-    dataService.init();
     const cleanPhone = normalizePhoneNumber(phone);
 
-    // Multi-device sync: ensure local storage is up-to-date with Firestore
     try {
       await dataService.ensureSynced();
     } catch {
@@ -142,8 +157,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     let user = dataService.getUserByPhone(cleanPhone);
-
-    // Multi-device fallback: fetch directly from Firestore if still not in local cache
     if (!user) {
       user = (await dataService.fetchUserFromFirestore(cleanPhone)) || undefined;
     }
@@ -159,7 +172,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Validate password
     let valid = dataService.checkUserPassword(cleanPhone, passwordPlain);
     if (!valid) {
-      // Re-fetch from Firestore in case password was updated on another device
       const cloudUser = await dataService.fetchUserFromFirestore(cleanPhone);
       if (cloudUser) {
         user = cloudUser;
@@ -195,7 +207,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const loginStudentPhone = async (phone: string) => {
-    dataService.init();
     const settings = dataService.getSettings();
     if (!settings.studentQuickAccessEnabled) {
       return {
@@ -209,9 +220,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: false, error: 'Please enter a valid phone number.' };
     }
 
+    try {
+      await dataService.ensureSynced();
+    } catch {
+      // Ignore
+    }
+
     let matches = dataService.getStudentsByPhone(cleanPhone);
     if (matches.length === 0) {
-      // Multi-device fallback: check Firestore
       matches = await dataService.fetchStudentsFromFirestore(cleanPhone);
     }
 
@@ -222,6 +238,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
     }
 
+    setAssociatedStudents(matches);
+    localStorage.setItem('cre_auth_phone', cleanPhone);
     return { success: true, students: matches };
   };
 
@@ -233,7 +251,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem('cre_auth_role', 'STUDENT');
     localStorage.setItem('cre_auth_student_id', student.id);
     localStorage.setItem('cre_auth_center', student.centerId);
-    router.push('/student');
+    router.replace('/student');
+  };
+
+  const switchStudentSession = (student: Student) => {
+    setSelectedStudent(student);
+    setActiveCenterIdState(student.centerId);
+    localStorage.setItem('cre_auth_student_id', student.id);
+    localStorage.setItem('cre_auth_center', student.centerId);
   };
 
   const completePasswordChange = async (newPassword: string) => {
@@ -263,10 +288,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return false;
   };
 
+  const updateSuperAdminPhoneAndPin = async (
+    newPhone: string,
+    newPin?: string,
+    newName?: string,
+    newPlace?: string
+  ) => {
+    const cleanPhone = normalizePhoneNumber(newPhone);
+    const success = dataService.updateSuperAdminCredentials(cleanPhone, newPin, newName);
+    if (success) {
+      if (newPlace && cleanPhone) {
+        dataService.updateAdminProfile(cleanPhone, { name: newName || 'Super Admin', place: newPlace });
+      }
+      const updated = dataService.getUserByPhone(cleanPhone);
+      if (updated) {
+        setAdminUser({ ...updated });
+      }
+      localStorage.setItem('cre_auth_phone', cleanPhone);
+      refreshData();
+      return true;
+    }
+    return false;
+  };
+
   const logout = () => {
     setRole(null);
     setAdminUser(null);
     setSelectedStudent(null);
+    setAssociatedStudents([]);
     setActiveCenterIdState(null);
 
     localStorage.removeItem('cre_auth_role');
@@ -274,7 +323,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem('cre_auth_student_id');
     localStorage.removeItem('cre_auth_center');
 
-    router.push('/login');
+    router.replace('/login');
   };
 
   return (
@@ -283,17 +332,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         role,
         adminUser,
         selectedStudent,
-        activeCenterId: activeCenter?.id || null,
+        associatedStudents,
+        activeCenterId,
         activeCenter,
         availableCenters,
         isLoading,
         loginAdmin,
         loginStudentPhone,
         selectStudentSession,
+        switchStudentSession,
         setActiveCenterId,
         logout,
         completePasswordChange,
         updateCurrentAdminProfile,
+        updateSuperAdminPhoneAndPin,
         refreshData,
       }}
     >

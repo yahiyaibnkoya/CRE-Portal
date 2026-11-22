@@ -188,8 +188,9 @@ export default function CenterAdminStudentsPage() {
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 border-b border-cre-border text-[11px] font-bold text-cre-navy uppercase tracking-wider">
                 <tr>
-                  <th className="py-3.5 px-4">Adm No</th>
+                  <th className="py-3.5 px-4 w-12 text-center">#</th>
                   <th className="py-3.5 px-4">Student Name</th>
+                  <th className="py-3.5 px-4">Adm No.</th>
                   <th className="py-3.5 px-4">Gender</th>
                   <th className="py-3.5 px-4">Parent / Guardian</th>
                   <th className="py-3.5 px-4">Parent Phone</th>
@@ -200,14 +201,19 @@ export default function CenterAdminStudentsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-cre-border">
-                {filteredStudents.map((s) => (
+                {filteredStudents.map((s, idx) => (
                   <tr key={s.id} className="hover:bg-slate-50/70 transition-colors">
-                    <td className="py-3.5 px-4 font-mono font-bold text-cre-navy">
-                      {s.admissionNumber}
+                    <td className="py-3.5 px-4 text-center font-bold text-slate-400 text-xs">
+                      {idx + 1}
                     </td>
                     <td className="py-3.5 px-4">
                       <span className="font-bold text-slate-900 block">{s.name}</span>
                       <span className="text-[10px] text-slate-400">Admitted: {s.admissionDate}</span>
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <span className="inline-block font-mono font-bold text-[11px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md border border-slate-200">
+                        {s.admissionNumber}
+                      </span>
                     </td>
                     <td className="py-3.5 px-4">
                       <span

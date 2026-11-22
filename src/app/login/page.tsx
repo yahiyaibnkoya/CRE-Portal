@@ -88,11 +88,11 @@ function LoginFormContent() {
 
   const { loginAdmin, loginStudentPhone, selectStudentSession, role } = useAuth();
 
-  // If already authenticated, redirect to respective dashboard
+  // If already authenticated, redirect to respective dashboard without polluting back history
   useEffect(() => {
-    if (role === 'SUPER_ADMIN') router.push('/super-admin');
-    else if (role === 'CENTER_ADMIN') router.push('/center-admin');
-    else if (role === 'STUDENT') router.push('/student');
+    if (role === 'SUPER_ADMIN') router.replace('/super-admin');
+    else if (role === 'CENTER_ADMIN') router.replace('/center-admin');
+    else if (role === 'STUDENT') router.replace('/student');
   }, [role, router]);
 
   useEffect(() => {
@@ -137,9 +137,9 @@ function LoginFormContent() {
         setFailedAttempts(0);
         setLockoutRemaining(0);
         if (result.role === 'SUPER_ADMIN') {
-          router.push('/super-admin');
+          router.replace('/super-admin');
         } else {
-          router.push('/center-admin');
+          router.replace('/center-admin');
         }
       }
     } catch {

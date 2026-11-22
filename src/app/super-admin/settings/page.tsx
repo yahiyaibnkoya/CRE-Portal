@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { AppShell } from '@/components/layout/AppShell';
 import { useAuth } from '@/context/AuthContext';
 import { dataService } from '@/lib/dataService';
+import { PinInput } from '@/components/ui/PinInput';
 import {
   Settings,
   ShieldCheck,
@@ -17,16 +18,21 @@ import {
   Plus,
   Trash2,
   FileText,
+  KeyRound,
+  AlertCircle,
 } from 'lucide-react';
 
 export default function SuperAdminSettingsPage() {
-  const { adminUser, updateCurrentAdminProfile, refreshData } = useAuth();
+  const { adminUser, updateCurrentAdminProfile, updateSuperAdminPhoneAndPin, refreshData } = useAuth();
   const currentSettings = dataService.getSettings();
 
-  // Admin Profile Details
+  // Admin Profile Details & Credentials
   const [profileName, setProfileName] = useState(adminUser?.name || 'Super Admin');
+  const [profilePhone, setProfilePhone] = useState(adminUser?.phone || '9644889944');
   const [profilePlace, setProfilePlace] = useState(adminUser?.place || 'Calicut');
+  const [profilePin, setProfilePin] = useState(adminUser?.passwordPin || '9944');
   const [profileSuccess, setProfileSuccess] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
 
   const [approvalMode, setApprovalMode] = useState<'automatic' | 'manual'>(
     currentSettings.newCenterApprovalMode
@@ -44,12 +50,36 @@ export default function SuperAdminSettingsPage() {
 
   const auditLogs = dataService.getAuditLogs();
 
-  const handleUpdateProfile = (e: React.FormEvent) => {
+  const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!profileName.trim()) return;
-    updateCurrentAdminProfile(profileName.trim(), profilePlace.trim());
-    setProfileSuccess(true);
-    setTimeout(() => setProfileSuccess(false), 3000);
+    setProfileError(null);
+    if (!profileName.trim()) {
+      setProfileError('Please enter administrator full name.');
+      return;
+    }
+    const cleanPhone = profilePhone.replace(/\D/g, '');
+    if (cleanPhone.length < 10) {
+      setProfileError('Please enter a valid 10-digit mobile number.');
+      return;
+    }
+    if (profilePin && profilePin.length !== 4) {
+      setProfileError('Login PIN must be exactly a 4-digit number.');
+      return;
+    }
+
+    const success = await updateSuperAdminPhoneAndPin(
+      cleanPhone,
+      profilePin,
+      profileName.trim(),
+      profilePlace.trim()
+    );
+    if (success) {
+      setSuperPhone(cleanPhone);
+      setProfileSuccess(true);
+      setTimeout(() => setProfileSuccess(false), 5000);
+    } else {
+      setProfileError('Failed to update Super Admin credentials.');
+    }
   };
 
   const handleSaveSettings = (e: React.FormEvent) => {
@@ -78,39 +108,17 @@ export default function SuperAdminSettingsPage() {
     setDistricts(districts.filter((item) => item !== d));
   };
 
-  const handleExportBackup = () => {
-    const dump = dataService.exportData();
-    const blob = new Blob([JSON.stringify(dump, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `cre_portal_backup_${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
   return (
     <AppShell>
       <div className="space-y-6 max-w-5xl">
         {/* Header */}
-        <div className="pb-2 border-b border-cre-border flex items-center justify-between">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-black text-cre-navy">
-              System Settings & Controls
-            </h1>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Super Admin platform configuration, security policies, and database backup
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleExportBackup}
-            className="inline-flex items-center px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-cre-navy hover:bg-cre-navy-hover transition-all shadow-md shadow-cre-navy/20"
-          >
-            <Download className="w-4 h-4 mr-1.5" />
-            Download Database Backup
-          </button>
+        <div className="pb-2 border-b border-cre-border">
+          <h1 className="text-xl sm:text-2xl font-black text-cre-navy">
+            System Settings & Controls
+          </h1>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Super Admin platform configuration, credential security, and state controls
+          </p>
         </div>
 
         {savedSuccess && (
@@ -120,27 +128,36 @@ export default function SuperAdminSettingsPage() {
           </div>
         )}
 
-        {/* Super Admin Profile Details Card */}
+        {/* Super Admin Profile Details & Credentials Card */}
         <div className="bg-white p-6 rounded-2xl border border-cre-border shadow-xs">
           <div className="flex items-center space-x-3 mb-4 pb-3 border-b border-slate-100">
             <div className="p-2 rounded-xl bg-cre-navy text-white shadow-xs">
               <ShieldCheck className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-cre-navy">Super Admin Details</h2>
-              <p className="text-xs text-slate-500">Update your administrator name, phone number, and location</p>
+              <h2 className="text-sm font-bold text-cre-navy">Super Admin Details & Login Credentials</h2>
+              <p className="text-xs text-slate-500">
+                Update your administrator profile, login mobile number, and 4-digit PIN. Changes take effect immediately in the database and for login across all devices.
+              </p>
             </div>
           </div>
 
           {profileSuccess && (
-            <div className="mb-4 p-3.5 bg-cre-green-light border border-cre-green/30 rounded-xl flex items-center space-x-2 text-xs text-cre-green font-bold">
+            <div className="mb-4 p-3.5 bg-cre-green-light border border-cre-green/30 rounded-xl flex items-center space-x-2 text-xs text-cre-green font-bold shadow-xs">
               <CheckCircle className="w-4 h-4 shrink-0 text-cre-green" />
-              <span>Administrator details updated successfully.</span>
+              <span>Super Admin profile, phone number ({profilePhone}), and PIN updated successfully in the database.</span>
+            </div>
+          )}
+
+          {profileError && (
+            <div className="mb-4 p-3.5 bg-red-50 border border-red-200 rounded-xl flex items-center space-x-2 text-xs text-red-700 font-bold shadow-xs">
+              <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+              <span>{profileError}</span>
             </div>
           )}
 
           <form onSubmit={handleUpdateProfile} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   Administrator Full Name *
@@ -157,22 +174,23 @@ export default function SuperAdminSettingsPage() {
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Phone Number (Logged-In Number)
+                  Super Admin Phone Number *
                 </label>
                 <div className="relative">
                   <input
                     type="tel"
-                    disabled
-                    readOnly
-                    value={adminUser?.phone || ''}
-                    className="w-full pl-3.5 pr-8 py-2 text-xs font-bold border border-slate-200 rounded-xl bg-slate-100 text-slate-600 cursor-not-allowed"
+                    required
+                    value={profilePhone}
+                    onChange={(e) => setProfilePhone(e.target.value)}
+                    placeholder="e.g. 9644889944"
+                    className="w-full pl-3.5 pr-8 py-2 text-xs font-bold border border-cre-border rounded-xl focus:ring-2 focus:ring-cre-green outline-hidden font-mono text-cre-navy"
                   />
-                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-400">
-                    <Lock className="w-3.5 h-3.5" />
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-cre-green">
+                    <Phone className="w-3.5 h-3.5" />
                   </div>
                 </div>
                 <span className="text-[10px] text-slate-400 mt-1 block">
-                  Registered authentication number
+                  Used for Super Admin login
                 </span>
               </div>
 
@@ -189,14 +207,31 @@ export default function SuperAdminSettingsPage() {
                   className="w-full px-3.5 py-2 text-xs font-semibold border border-cre-border rounded-xl focus:ring-2 focus:ring-cre-green outline-hidden"
                 />
               </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  4-Digit Login PIN *
+                </label>
+                <div className="bg-slate-50 p-2 rounded-xl border border-cre-border flex items-center justify-center">
+                  <PinInput
+                    value={profilePin}
+                    onChange={(v) => setProfilePin(v)}
+                    length={4}
+                  />
+                </div>
+                <span className="text-[10px] text-slate-400 mt-1 block text-center">
+                  4-digit authentication PIN
+                </span>
+              </div>
             </div>
 
             <div className="flex justify-end pt-2">
               <button
                 type="submit"
-                className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-cre-navy hover:bg-cre-navy-hover transition-all shadow-xs"
+                className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-cre-navy hover:bg-cre-navy-hover transition-all shadow-xs inline-flex items-center"
               >
-                Save Admin Profile
+                <KeyRound className="w-3.5 h-3.5 mr-1.5" />
+                Save Super Admin Details & PIN
               </button>
             </div>
           </form>

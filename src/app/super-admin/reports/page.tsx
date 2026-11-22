@@ -25,6 +25,7 @@ import {
   Phone,
   SlidersHorizontal,
   X,
+  Search,
 } from 'lucide-react';
 
 function SuperAdminReportsContent() {
@@ -35,7 +36,10 @@ function SuperAdminReportsContent() {
 
   const [selectedCenter, setSelectedCenter] = useState<string>(initialCenter);
   const [reportType, setReportType] = useState<'class_attendance' | 'fee' | 'attendance' | 'financial' | 'exam'>(initialTab);
-  const [selectedMonth, setSelectedMonth] = useState<string>('2026-11');
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => new Date().toISOString().slice(0, 7));
+  const [searchQuery, setSearchQuery] = useState('');
+  const [genderFilter, setGenderFilter] = useState<'ALL' | 'Boy' | 'Girl'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [copied, setCopied] = useState(false);
 
   // Column Visibility Filters (Add/Remove content)
@@ -169,6 +173,74 @@ function SuperAdminReportsContent() {
     }
     return dataService.getExamMarks(selectedCenter);
   }, [selectedCenter, centers]);
+
+  // Real-time dynamic filtered records
+  const filteredClassRecords = useMemo(() => {
+    return classAttendanceData.records.filter((r) => {
+      const st = dataService.getStudentById(r.studentId);
+      if (!st) return false;
+      if (genderFilter !== 'ALL' && (st.gender || 'Boy') !== genderFilter) return false;
+      if (statusFilter !== 'ALL' && r.status !== statusFilter) return false;
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        const matchName = st.name.toLowerCase().includes(q);
+        const matchAdm = (st.admissionNumber || '').toLowerCase().includes(q);
+        const matchPlace = (st.place || '').toLowerCase().includes(q);
+        const matchPhone = (st.parentPhone || st.studentPhone || '').includes(q);
+        return matchName || matchAdm || matchPlace || matchPhone;
+      }
+      return true;
+    });
+  }, [classAttendanceData.records, genderFilter, statusFilter, searchQuery]);
+
+  const filteredActiveStudents = useMemo(() => {
+    const activeSt = students.filter((s) => s.status === 'Active');
+    return activeSt.filter((st) => {
+      if (genderFilter !== 'ALL' && (st.gender || 'Boy') !== genderFilter) return false;
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        const matchName = st.name.toLowerCase().includes(q);
+        const matchAdm = (st.admissionNumber || '').toLowerCase().includes(q);
+        const matchPlace = (st.place || '').toLowerCase().includes(q);
+        const matchPhone = (st.parentPhone || st.studentPhone || '').includes(q);
+        return matchName || matchAdm || matchPlace || matchPhone;
+      }
+      return true;
+    });
+  }, [students, genderFilter, searchQuery]);
+
+  const filteredMonthlyFees = useMemo(() => {
+    return monthlyFees.filter((f) => {
+      const st = dataService.getStudentById(f.studentId);
+      if (!st) return false;
+      if (genderFilter !== 'ALL' && (st.gender || 'Boy') !== genderFilter) return false;
+      if (statusFilter !== 'ALL' && f.status !== statusFilter) return false;
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        const matchName = st.name.toLowerCase().includes(q);
+        const matchAdm = (st.admissionNumber || '').toLowerCase().includes(q);
+        const matchPlace = (st.place || '').toLowerCase().includes(q);
+        return matchName || matchAdm || matchPlace;
+      }
+      return true;
+    });
+  }, [monthlyFees, genderFilter, statusFilter, searchQuery]);
+
+  const filteredExamMarks = useMemo(() => {
+    return allExamMarks.filter((m) => {
+      const st = dataService.getStudentById(m.studentId);
+      if (!st) return false;
+      if (genderFilter !== 'ALL' && (st.gender || 'Boy') !== genderFilter) return false;
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        const matchName = st.name.toLowerCase().includes(q);
+        const matchAdm = (st.admissionNumber || '').toLowerCase().includes(q);
+        const matchPlace = (st.place || '').toLowerCase().includes(q);
+        return matchName || matchAdm || matchPlace;
+      }
+      return true;
+    });
+  }, [allExamMarks, genderFilter, searchQuery]);
 
   // Generate WhatsApp text respecting column toggles
   const whatsAppText = useMemo(() => {
@@ -565,56 +637,150 @@ function SuperAdminReportsContent() {
         </div>
 
         {/* Filters & Action Buttons */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center space-x-2 bg-white px-3 py-2 rounded-xl border border-cre-border text-xs">
-              <span className="text-slate-400 font-medium">Centre:</span>
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Search Filter */}
+            <div className="relative min-w-[200px]">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search student or adm no..."
+                className="w-full pl-8 pr-7 py-1.5 text-xs border border-cre-border rounded-xl bg-white focus:ring-2 focus:ring-cre-green focus:outline-hidden"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 text-xs"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+
+            {/* Centre Filter */}
+            <div className="flex items-center space-x-2 bg-white px-3 py-1.5 rounded-xl border border-cre-border text-xs">
+              <span className="text-slate-400 font-medium text-[11px]">Centre:</span>
               <select
                 value={selectedCenter}
                 onChange={(e) => setSelectedCenter(e.target.value)}
                 className="bg-transparent text-slate-800 font-semibold focus:outline-hidden cursor-pointer"
               >
+                <option value="ALL">All CRE Centres (Statewide)</option>
                 {centers.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
                   </option>
                 ))}
-                {reportType !== 'class_attendance' && (
-                  <option value="ALL">All CRE Centres (Statewide)</option>
-                )}
               </select>
             </div>
 
             {reportType === 'class_attendance' ? (
-              <div className="flex items-center space-x-2 bg-white px-3 py-2 rounded-xl border border-cre-border text-xs font-semibold text-slate-800">
-                <Calendar className="w-4 h-4 text-cre-green" />
-                <span className="text-slate-400 font-medium">Class Date:</span>
-                <select
+              <div className="flex items-center space-x-2 bg-white px-3 py-1.5 rounded-xl border border-cre-border text-xs font-semibold text-slate-800">
+                <Calendar className="w-3.5 h-3.5 text-cre-green shrink-0" />
+                <span className="text-slate-400 font-medium text-[11px]">Class Date:</span>
+                <input
+                  type="date"
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
-                  className="bg-transparent font-bold text-cre-navy focus:outline-hidden cursor-pointer"
-                >
-                  {availableDates.map((d) => (
-                    <option key={d} value={d}>
-                      {d}
-                    </option>
-                  ))}
-                  {availableDates.length === 0 && <option value="2026-11-08">2026-11-08</option>}
-                </select>
+                  className="bg-transparent font-bold text-cre-navy text-xs focus:outline-hidden cursor-pointer"
+                />
+                {availableDates.length > 0 && (
+                  <select
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    className="bg-slate-50 border border-slate-200 text-slate-700 text-[11px] rounded-lg px-2 py-0.5 font-medium cursor-pointer"
+                    title="Jump to recorded date"
+                  >
+                    <option value="">Recorded Dates ({availableDates.length})</option>
+                    {availableDates.map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
             ) : reportType === 'exam' ? (
-              <div className="text-xs font-bold text-cre-navy bg-white px-3.5 py-2 rounded-xl border border-cre-border">
+              <div className="text-xs font-bold text-cre-navy bg-white px-3 py-1.5 rounded-xl border border-cre-border">
                 All Examination Records
               </div>
             ) : (
-              <div className="flex items-center space-x-2 bg-white px-3 py-2 rounded-xl border border-cre-border text-xs font-semibold text-slate-800">
-                <span className="text-slate-400 font-medium">Period:</span>
+              <div className="flex items-center space-x-2 bg-white px-3 py-1.5 rounded-xl border border-cre-border text-xs font-semibold text-slate-800">
+                <Calendar className="w-3.5 h-3.5 text-cre-navy shrink-0" />
+                <span className="text-slate-400 font-medium text-[11px]">Period:</span>
                 <input
                   type="month"
                   value={selectedMonth}
                   onChange={(e) => setSelectedMonth(e.target.value)}
-                  className="bg-transparent text-slate-800 focus:outline-hidden cursor-pointer"
+                  className="bg-transparent text-xs font-bold text-cre-navy focus:outline-hidden cursor-pointer"
                 />
+                <button
+                  type="button"
+                  onClick={() => setSelectedMonth(new Date().toISOString().slice(0, 7))}
+                  className="text-[10px] text-cre-green hover:underline font-bold px-1.5 py-0.5 rounded-md bg-cre-green-light"
+                >
+                  This Month
+                </button>
+              </div>
+            )}
+
+            {/* Quick Gender Filter Pills */}
+            <div className="flex items-center space-x-1 bg-white p-1 rounded-xl border border-cre-border text-[11px]">
+              {(['ALL', 'Boy', 'Girl'] as const).map((g) => (
+                <button
+                  key={g}
+                  type="button"
+                  onClick={() => setGenderFilter(g)}
+                  className={`px-2 py-0.5 rounded-lg font-bold transition-all ${
+                    genderFilter === g
+                      ? 'bg-cre-navy text-white shadow-xs'
+                      : 'text-slate-600 hover:text-cre-navy hover:bg-slate-50'
+                  }`}
+                >
+                  {g === 'ALL' ? 'All' : g === 'Boy' ? 'Boys' : 'Girls'}
+                </button>
+              ))}
+            </div>
+
+            {/* Status Filter for Attendance / Fees */}
+            {reportType === 'class_attendance' && (
+              <div className="flex items-center space-x-1 bg-white p-1 rounded-xl border border-cre-border text-[11px]">
+                {(['ALL', 'Present', 'Absent', 'Leave'] as const).map((st) => (
+                  <button
+                    key={st}
+                    type="button"
+                    onClick={() => setStatusFilter(st)}
+                    className={`px-2 py-0.5 rounded-lg font-bold transition-all ${
+                      statusFilter === st
+                        ? 'bg-cre-green text-white shadow-xs'
+                        : 'text-slate-600 hover:text-cre-navy hover:bg-slate-50'
+                    }`}
+                  >
+                    {st === 'ALL' ? 'All Status' : st}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {reportType === 'fee' && (
+              <div className="flex items-center space-x-1 bg-white p-1 rounded-xl border border-cre-border text-[11px]">
+                {(['ALL', 'Paid', 'Partially Paid', 'Unpaid'] as const).map((fst) => (
+                  <button
+                    key={fst}
+                    type="button"
+                    onClick={() => setStatusFilter(fst)}
+                    className={`px-2 py-0.5 rounded-lg font-bold transition-all ${
+                      statusFilter === fst
+                        ? 'bg-cre-navy text-white shadow-xs'
+                        : 'text-slate-600 hover:text-cre-navy hover:bg-slate-50'
+                    }`}
+                  >
+                    {fst === 'ALL' ? 'All Fees' : fst}
+                  </button>
+                ))}
               </div>
             )}
           </div>
@@ -806,7 +972,7 @@ function SuperAdminReportsContent() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-cre-border">
-                    {classAttendanceData.records.map((r, idx) => {
+                    {filteredClassRecords.map((r, idx) => {
                       const st = dataService.getStudentById(r.studentId);
                       return (
                         <tr key={r.id} className="hover:bg-slate-50/60 transition-colors">
@@ -854,6 +1020,13 @@ function SuperAdminReportsContent() {
                         </tr>
                       );
                     })}
+                    {filteredClassRecords.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="py-8 text-center text-slate-400">
+                          No matching attendance records found for this class date.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -910,7 +1083,7 @@ function SuperAdminReportsContent() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-cre-border">
-                    {students.map((s, idx) => {
+                    {filteredActiveStudents.map((s, idx) => {
                       const att = dataService.calculateStudentAttendance(s.id, s.centerId, selectedMonth);
                       return (
                         <tr key={s.id} className="hover:bg-slate-50/60 transition-colors">
@@ -959,6 +1132,13 @@ function SuperAdminReportsContent() {
                         </tr>
                       );
                     })}
+                    {filteredActiveStudents.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="py-8 text-center text-slate-400">
+                          No matching active students found.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -1020,7 +1200,7 @@ function SuperAdminReportsContent() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-cre-border">
-                    {monthlyFees.map((f, idx) => {
+                    {filteredMonthlyFees.map((f, idx) => {
                       const st = dataService.getStudentById(f.studentId);
                       return (
                         <tr key={f.id} className="hover:bg-slate-50/60 transition-colors">
@@ -1068,6 +1248,13 @@ function SuperAdminReportsContent() {
                         </tr>
                       );
                     })}
+                    {filteredMonthlyFees.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="py-8 text-center text-slate-400">
+                          No matching student fee records found for this period.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -1206,7 +1393,7 @@ function SuperAdminReportsContent() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-cre-border">
-                    {allExamMarks.map((m, idx) => {
+                    {filteredExamMarks.map((m, idx) => {
                       const st = dataService.getStudentById(m.studentId);
                       const ex = dataService.getExamById(m.examId);
                       return (
@@ -1253,10 +1440,10 @@ function SuperAdminReportsContent() {
                         </tr>
                       );
                     })}
-                    {allExamMarks.length === 0 && (
+                    {filteredExamMarks.length === 0 && (
                       <tr>
                         <td colSpan={7} className="py-8 text-center text-slate-400">
-                          No examination marks entered yet for this selection.
+                          No matching examination marks found.
                         </td>
                       </tr>
                     )}

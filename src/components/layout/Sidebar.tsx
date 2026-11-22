@@ -40,6 +40,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpenMobile = false, onCloseM
     { name: 'Dashboard', href: '/super-admin', icon: LayoutDashboard },
     { name: 'CRE Centres', href: '/super-admin/centers', icon: Building2 },
     { name: 'Centre Administrators', href: '/super-admin/admins', icon: ShieldCheck },
+    { name: 'Faculties', href: '/super-admin/faculties', icon: GraduationCap },
     { name: 'Students', href: '/super-admin/students', icon: Users },
     { name: 'Financial Overview', href: '/super-admin/finance', icon: Wallet },
     { name: 'Donations', href: '/super-admin/donations', icon: HeartHandshake },

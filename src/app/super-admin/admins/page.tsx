@@ -27,6 +27,8 @@ export default function SuperAdminAdminsPage() {
   const { adminUser: currentSuperAdmin, refreshData } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [centerFilter, setCenterFilter] = useState('ALL');
+  const [roleFilter, setRoleFilter] = useState<'ALL' | 'SUPER_ADMIN' | 'CENTER_ADMIN'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -48,6 +50,9 @@ export default function SuperAdminAdminsPage() {
   const users = dataService.getUsers();
 
   const filteredUsers = users.filter((u) => {
+    if (roleFilter !== 'ALL' && u.role !== roleFilter) return false;
+    if (statusFilter === 'ACTIVE' && !u.isActive) return false;
+    if (statusFilter === 'INACTIVE' && u.isActive) return false;
     if (centerFilter !== 'ALL') {
       if (!u.centerIds.includes(centerFilter)) return false;
     }
@@ -55,7 +60,8 @@ export default function SuperAdminAdminsPage() {
       const q = searchTerm.toLowerCase();
       const matchName = u.name.toLowerCase().includes(q);
       const matchPhone = u.phone.includes(q);
-      return matchName || matchPhone;
+      const matchPlace = (u.place || '').toLowerCase().includes(q);
+      return matchName || matchPhone || matchPlace;
     }
     return true;
   });
@@ -156,24 +162,30 @@ export default function SuperAdminAdminsPage() {
   const handleConfirmDelete = () => {
     if (!deletingAdmin) return;
     if (deletingAdmin.role === 'SUPER_ADMIN') {
-      setError('Super Admin account cannot be deleted. You can edit the account details instead.');
-      setDeletingAdmin(null);
-      return;
+      const allSuperAdmins = users.filter((u) => u.role === 'SUPER_ADMIN');
+      if (allSuperAdmins.length <= 1) {
+        setError('The primary Super Admin account cannot be deleted unless another Super Admin is added first.');
+        setDeletingAdmin(null);
+        return;
+      }
     }
     if (deletingAdmin.phone === currentSuperAdmin?.phone) {
-      setError('You cannot delete your own currently logged-in account.');
-      setDeletingAdmin(null);
-      return;
+      const allSuperAdmins = users.filter((u) => u.role === 'SUPER_ADMIN');
+      if (allSuperAdmins.length <= 1) {
+        setError('You cannot delete your own account when you are the sole Super Admin.');
+        setDeletingAdmin(null);
+        return;
+      }
     }
 
-    try {
-      dataService.deleteUser(deletingAdmin.uid, currentSuperAdmin?.name || 'Super Admin');
+    const res = dataService.deleteUser(deletingAdmin.uid);
+    if (res.success) {
       setSuccessMsg(`Administrator "${deletingAdmin.name}" (${deletingAdmin.phone}) deleted successfully.`);
       setDeletingAdmin(null);
       setTimeout(() => setSuccessMsg(null), 5000);
       refreshData();
-    } catch (err: any) {
-      setError(err?.message || 'Failed to delete administrator account.');
+    } else {
+      setError(res.error || 'Failed to delete administrator account.');
       setDeletingAdmin(null);
       setTimeout(() => setError(null), 5000);
     }
@@ -211,21 +223,148 @@ export default function SuperAdminAdminsPage() {
           </div>
         )}
 
+        {/* Dynamic Exciting Filter Stat Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+          <button
+            type="button"
+            onClick={() => {
+              setRoleFilter('ALL');
+              setStatusFilter('ALL');
+            }}
+            className={`p-4 rounded-2xl border text-left transition-all ${
+              roleFilter === 'ALL' && statusFilter === 'ALL'
+                ? 'bg-cre-navy text-white border-cre-navy shadow-md scale-[1.02]'
+                : 'bg-white text-slate-800 border-cre-border hover:border-slate-300 shadow-xs'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className={`text-[11px] font-bold uppercase tracking-wider ${roleFilter === 'ALL' && statusFilter === 'ALL' ? 'text-white/80' : 'text-slate-400'}`}>
+                All Administrators
+              </span>
+              <ShieldCheck className={`w-4 h-4 ${roleFilter === 'ALL' && statusFilter === 'ALL' ? 'text-white' : 'text-cre-navy'}`} />
+            </div>
+            <div className="text-2xl font-black mt-2">{users.length}</div>
+            <span className={`text-[10px] mt-0.5 block ${roleFilter === 'ALL' && statusFilter === 'ALL' ? 'text-white/70' : 'text-slate-400'}`}>
+              Full administrative user list
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setRoleFilter(roleFilter === 'SUPER_ADMIN' ? 'ALL' : 'SUPER_ADMIN');
+              setStatusFilter('ALL');
+            }}
+            className={`p-4 rounded-2xl border text-left transition-all ${
+              roleFilter === 'SUPER_ADMIN'
+                ? 'bg-cre-navy text-white border-cre-navy shadow-md scale-[1.02]'
+                : 'bg-white text-slate-800 border-cre-border hover:border-cre-navy/40 shadow-xs'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className={`text-[11px] font-bold uppercase tracking-wider ${roleFilter === 'SUPER_ADMIN' ? 'text-white/80' : 'text-cre-navy'}`}>
+                Super Admins
+              </span>
+              <ShieldCheck className={`w-4 h-4 ${roleFilter === 'SUPER_ADMIN' ? 'text-white' : 'text-cre-navy'}`} />
+            </div>
+            <div className={`text-2xl font-black mt-2 ${roleFilter === 'SUPER_ADMIN' ? 'text-white' : 'text-cre-navy'}`}>
+              {users.filter((u) => u.role === 'SUPER_ADMIN').length}
+            </div>
+            <span className={`text-[10px] mt-0.5 block ${roleFilter === 'SUPER_ADMIN' ? 'text-white/70' : 'text-slate-400'}`}>
+              Statewide administrative access
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setRoleFilter(roleFilter === 'CENTER_ADMIN' ? 'ALL' : 'CENTER_ADMIN');
+              setStatusFilter('ALL');
+            }}
+            className={`p-4 rounded-2xl border text-left transition-all ${
+              roleFilter === 'CENTER_ADMIN'
+                ? 'bg-cre-green text-white border-cre-green shadow-md scale-[1.02]'
+                : 'bg-white text-slate-800 border-cre-border hover:border-cre-green/40 shadow-xs'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className={`text-[11px] font-bold uppercase tracking-wider ${roleFilter === 'CENTER_ADMIN' ? 'text-white/80' : 'text-cre-green'}`}>
+                Centre Admins
+              </span>
+              <Building className={`w-4 h-4 ${roleFilter === 'CENTER_ADMIN' ? 'text-white' : 'text-cre-green'}`} />
+            </div>
+            <div className={`text-2xl font-black mt-2 ${roleFilter === 'CENTER_ADMIN' ? 'text-white' : 'text-cre-green'}`}>
+              {users.filter((u) => u.role === 'CENTER_ADMIN').length}
+            </div>
+            <span className={`text-[10px] mt-0.5 block ${roleFilter === 'CENTER_ADMIN' ? 'text-white/70' : 'text-slate-400'}`}>
+              Local CRE centre managers
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setStatusFilter(statusFilter === 'ACTIVE' ? 'ALL' : 'ACTIVE');
+              setRoleFilter('ALL');
+            }}
+            className={`p-4 rounded-2xl border text-left transition-all ${
+              statusFilter === 'ACTIVE'
+                ? 'bg-emerald-600 text-white border-emerald-600 shadow-md scale-[1.02]'
+                : 'bg-white text-slate-800 border-cre-border hover:border-emerald-400 shadow-xs'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className={`text-[11px] font-bold uppercase tracking-wider ${statusFilter === 'ACTIVE' ? 'text-white/80' : 'text-emerald-600'}`}>
+                Active Accounts
+              </span>
+              <CheckCircle className={`w-4 h-4 ${statusFilter === 'ACTIVE' ? 'text-white' : 'text-emerald-600'}`} />
+            </div>
+            <div className={`text-2xl font-black mt-2 ${statusFilter === 'ACTIVE' ? 'text-white' : 'text-emerald-600'}`}>
+              {users.filter((u) => u.isActive).length}
+            </div>
+            <span className={`text-[10px] mt-0.5 block ${statusFilter === 'ACTIVE' ? 'text-white/70' : 'text-slate-400'}`}>
+              Currently enabled for login
+            </span>
+          </button>
+        </div>
+
         {/* Filter Bar */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="relative">
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search administrator by name or phone..."
+              placeholder="Search administrator by name, phone, or place..."
               className="w-full pl-10 pr-4 py-2 text-xs border border-cre-border rounded-xl bg-white focus:ring-2 focus:ring-cre-green focus:outline-hidden"
             />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 text-xs"
+              >
+                Clear
+              </button>
+            )}
           </div>
 
           <div className="flex items-center space-x-2 bg-white px-3 py-2 rounded-xl border border-cre-border text-xs">
-            <span className="text-slate-400 font-medium">Filter by Centre:</span>
+            <span className="text-slate-400 font-medium">Role:</span>
+            <select
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value as any)}
+              className="bg-transparent text-slate-800 font-semibold focus:outline-hidden cursor-pointer w-full"
+            >
+              <option value="ALL">All Roles ({users.length})</option>
+              <option value="SUPER_ADMIN">Super Admins ({users.filter((u) => u.role === 'SUPER_ADMIN').length})</option>
+              <option value="CENTER_ADMIN">Centre Admins ({users.filter((u) => u.role === 'CENTER_ADMIN').length})</option>
+            </select>
+          </div>
+
+          <div className="flex items-center space-x-2 bg-white px-3 py-2 rounded-xl border border-cre-border text-xs">
+            <span className="text-slate-400 font-medium">Centre:</span>
             <select
               value={centerFilter}
               onChange={(e) => setCenterFilter(e.target.value)}
@@ -247,6 +386,7 @@ export default function SuperAdminAdminsPage() {
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 border-b border-cre-border text-[11px] font-bold text-cre-navy uppercase tracking-wider">
                 <tr>
+                  <th className="py-3.5 px-4">#</th>
                   <th className="py-3.5 px-4">Administrator</th>
                   <th className="py-3.5 px-4">Mobile / Username</th>
                   <th className="py-3.5 px-4">Role</th>
@@ -257,17 +397,17 @@ export default function SuperAdminAdminsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-cre-border">
-                {filteredUsers.map((u) => {
+                {filteredUsers.map((u, idx) => {
                   const assignedCenters = centers.filter((c) => u.centerIds.includes(c.id));
                   const isSuperAdmin = u.role === 'SUPER_ADMIN';
-                  const isSoleAdmin = u.centerIds.some((cId) => {
-                    const activeCount = users.filter((o) => o.isActive && o.centerIds.includes(cId)).length;
-                    return activeCount <= 1;
-                  });
-                  const canDelete = !isSuperAdmin && !isSoleAdmin;
+                  const allSuperAdmins = users.filter((x) => x.role === 'SUPER_ADMIN');
+                  const canDelete = isSuperAdmin ? allSuperAdmins.length > 1 : true;
 
                   return (
                     <tr key={u.uid} className="hover:bg-slate-50/70 transition-colors">
+                      <td className="py-3.5 px-4 font-mono font-bold text-slate-400">
+                        #{idx + 1}
+                      </td>
                       <td className="py-3.5 px-4">
                         <span className="font-bold text-slate-900 block">{u.name}</span>
                         <span className="text-[10px] text-slate-400">UID: {u.uid}</span>

@@ -172,6 +172,21 @@ export interface DonatedContact {
   updatedAt: string;
 }
 
+export type FacultyStatus = 'Approved' | 'Pending';
+
+export interface Faculty {
+  id: string;
+  name: string;
+  phone: string;
+  place?: string;
+  qualification?: string;
+  status: FacultyStatus;
+  assignedCenterIds?: string[];
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface SystemSettings {
   newCenterApprovalMode: 'automatic' | 'manual';
   studentQuickAccessEnabled: boolean;
