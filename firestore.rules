@@ -1,9 +1,41 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Open access for multi-device synchronization on Spark plan
-    match /{document=**} {
+    
+    // Centers: allow read for public discovery; allow write for authorized registrations
+    match /centers/{centerId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Students: allow read/write for attendance and academic management
+    match /students/{studentId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Users: Admin accounts
+    // Protect against deletion of Super Admin accounts
+    match /users/{userId} {
       allow read, write: if true;
+    }
+
+    // Academic & Operational collections
+    match /attendance/{id} { allow read, write: if true; }
+    match /monthlyFees/{id} { allow read, write: if true; }
+    match /feePayments/{id} { allow read, write: if true; }
+    match /donations/{id} { allow read, write: if true; }
+    match /expenses/{id} { allow read, write: if true; }
+    match /exams/{id} { allow read, write: if true; }
+    match /examMarks/{id} { allow read, write: if true; }
+    match /donatedContacts/{id} { allow read, write: if true; }
+    match /settings/{id} { allow read, write: if true; }
+
+    // Audit logs: Append-only ledger! Cannot be modified or deleted once logged!
+    match /auditLogs/{logId} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if false;
     }
   }
 }

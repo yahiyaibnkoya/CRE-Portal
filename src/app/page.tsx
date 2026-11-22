@@ -136,7 +136,7 @@ export default function HomePage() {
             <button
               type="button"
               onClick={() => setIsAddCenterModalOpen(true)}
-              className="inline-flex items-center px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold text-cre-navy bg-cre-navy-light hover:bg-cre-navy hover:text-white transition-all shadow-xs"
+              className="inline-flex items-center min-h-[44px] px-3.5 py-2 sm:px-4 sm:py-2 rounded-xl text-xs font-bold text-cre-navy bg-cre-navy-light hover:bg-cre-navy hover:text-white transition-all shadow-xs"
             >
               <Plus className="w-3.5 h-3.5 mr-1 text-cre-green" />
               <span>Add CRE Centre</span>
@@ -238,13 +238,21 @@ export default function HomePage() {
 
       {/* Clean Compact Footer */}
       <footer className="mt-auto bg-slate-900 text-white py-6 border-t border-slate-800 text-xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
-          <div className="flex items-center space-x-2">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
+          <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-2">
             <span className="font-bold text-cre-green">CRE</span>
             <span className="text-slate-400">• Continuing Religious Education • Wisdom Islamic Students Organization</span>
           </div>
-          <div className="text-slate-400 text-[11px]">
-            All Rights Reserved
+          <div className="flex items-center space-x-4 text-slate-400 text-[11px]">
+            <Link href="/privacy" className="hover:text-white transition-colors">
+              Privacy Policy
+            </Link>
+            <span>•</span>
+            <Link href="/terms" className="hover:text-white transition-colors">
+              Terms of Service
+            </Link>
+            <span>•</span>
+            <span>All Rights Reserved</span>
           </div>
         </div>
       </footer>

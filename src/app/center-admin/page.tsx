@@ -552,7 +552,7 @@ export default function CenterAdminDashboardPage() {
                 {sessionBreakdown.length === 0 && (
                   <tr>
                     <td colSpan={7} className="py-8 text-center text-slate-400">
-                      No attendance sessions recorded yet. Click "Mark Attendance" to begin.
+                      No attendance sessions recorded yet. Click &quot;Mark Attendance&quot; to begin.
                     </td>
                   </tr>
                 )}

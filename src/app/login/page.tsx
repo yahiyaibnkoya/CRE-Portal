@@ -40,6 +40,16 @@ function LoginFormContent() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockoutSeconds, setLockoutRemaining] = useState(0);
+
+  useEffect(() => {
+    if (lockoutSeconds <= 0) return;
+    const timer = setInterval(() => {
+      setLockoutRemaining((prev) => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [lockoutSeconds]);
 
   // Multi-child selection state for Student/Parent login
   const [matchingStudents, setMatchingStudents] = useState<Student[] | null>(null);
@@ -95,6 +105,11 @@ function LoginFormContent() {
     e.preventDefault();
     setError(null);
 
+    if (lockoutSeconds > 0) {
+      setError(`Account access temporarily suspended for security. Please wait ${lockoutSeconds} seconds before trying again.`);
+      return;
+    }
+
     const clean = normalizePhoneNumber(phone);
     if (!clean || clean.length < 10) {
       setError('Please enter a valid 10-digit mobile phone number.');
@@ -109,8 +124,18 @@ function LoginFormContent() {
     try {
       const result = await loginAdmin(clean, password);
       if (!result.success) {
-        setError(result.error || 'Authentication failed. Please check your credentials.');
+        const nextAttempts = failedAttempts + 1;
+        if (nextAttempts >= 5) {
+          setLockoutRemaining(60);
+          setFailedAttempts(0);
+          setError('Too many failed attempts. Login locked for 60 seconds to protect account security.');
+        } else {
+          setFailedAttempts(nextAttempts);
+          setError(`${result.error || 'Authentication failed.'} (${5 - nextAttempts} attempts remaining)`);
+        }
       } else {
+        setFailedAttempts(0);
+        setLockoutRemaining(0);
         if (result.role === 'SUPER_ADMIN') {
           router.push('/super-admin');
         } else {
@@ -410,10 +435,12 @@ function LoginFormContent() {
               {/* Submit Button */}
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || (activeTab === 'admin' && lockoutSeconds > 0)}
                 className={`w-full flex items-center justify-center py-3 px-4 rounded-xl text-xs font-bold text-white shadow-md transition-all ${
                   activeTab === 'student'
                     ? 'bg-cre-green hover:bg-cre-green-hover shadow-cre-green/20'
+                    : lockoutSeconds > 0
+                    ? 'bg-slate-400 cursor-not-allowed shadow-none'
                     : 'bg-cre-navy hover:bg-cre-navy-hover shadow-cre-navy/20'
                 } disabled:opacity-50`}
               >
@@ -425,6 +452,8 @@ function LoginFormContent() {
                     </svg>
                     Verifying...
                   </span>
+                ) : lockoutSeconds > 0 ? (
+                  <span>Access Locked ({lockoutSeconds}s)</span>
                 ) : (
                   <>
                     <span>{activeTab === 'student' ? 'Access Student Portal' : 'Login to Dashboard'}</span>
