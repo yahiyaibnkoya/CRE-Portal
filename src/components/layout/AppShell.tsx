@@ -10,7 +10,7 @@ import { KeyRound, X, CheckCircle, ShieldAlert } from 'lucide-react';
 
 export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { adminUser, refreshData } = useAuth();
+  const { adminUser, refreshData, isLoading } = useAuth();
 
   const [showDefaultPinModal, setShowDefaultPinModal] = useState(false);
   const [isChangingPin, setIsChangingPin] = useState(false);
@@ -72,7 +72,14 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
           onCloseMobile={() => setIsMobileMenuOpen(false)}
         />
         <main className="flex-1 min-w-0 p-3 sm:p-5 lg:p-7 overflow-y-auto">
-          {children}
+          {isLoading ? (
+            <div className="min-h-[50vh] flex flex-col items-center justify-center space-y-4">
+              <div className="w-10 h-10 border-3 border-cre-green/30 border-t-cre-green rounded-full animate-spin" />
+              <p className="text-xs font-semibold text-slate-500 animate-pulse">Syncing with server...</p>
+            </div>
+          ) : (
+            children
+          )}
         </main>
       </div>
 

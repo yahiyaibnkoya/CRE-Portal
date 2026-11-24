@@ -15,6 +15,7 @@ interface AuthContextType {
   activeCenter: Center | null;
   availableCenters: Center[];
   isLoading: boolean;
+  dataVersion: number;
   loginAdmin: (phone: string, passwordPlain: string) => Promise<{ success: boolean; role?: UserRole; error?: string; mustChangePassword?: boolean }>;
   loginStudentPhone: (phone: string) => Promise<{ success: boolean; students?: Student[]; error?: string }>;
   selectStudentSession: (student: Student) => void;
@@ -42,6 +43,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [dataVersion, setDataVersion] = useState(0);
 
   const refreshData = () => setDataVersion((v) => v + 1);
+
+  // Subscribe to realtime dataService updates
+  useEffect(() => {
+    const unsub = dataService.subscribe(() => {
+      setDataVersion((v) => v + 1);
+    });
+    return unsub;
+  }, []);
 
   // Restore session on mount from pure Firestore database
   useEffect(() => {
@@ -95,7 +104,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       isMounted = false;
     };
-  }, [dataVersion]);
+  }, []);
 
   // Route protection using replace to prevent back button loops
   useEffect(() => {
@@ -337,6 +346,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         activeCenter,
         availableCenters,
         isLoading,
+        dataVersion,
         loginAdmin,
         loginStudentPhone,
         selectStudentSession,

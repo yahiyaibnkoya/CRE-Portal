@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { dataService } from '@/lib/dataService';
 import { MonthlyFeeRecord, FeePayment, Student, FeeStatus } from '@/types';
 import { formatCurrency } from '@/lib/constants';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import {
   IndianRupee,
   Plus,
@@ -19,16 +20,19 @@ import {
   X,
   ArrowUpRight,
   Edit2,
+  Trash2,
+  RotateCcw,
 } from 'lucide-react';
 
 export default function CenterAdminFeesPage() {
-  const { activeCenter, adminUser, refreshData } = useAuth();
+  const { activeCenter, adminUser, refreshData, dataVersion } = useAuth();
   const centerId = activeCenter?.id || '';
 
+  const [filterMode, setFilterMode] = useState<'month' | 'date'>('month');
   const [selectedMonth, setSelectedMonth] = useState('2026-11');
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
-  const [localVersion, setLocalVersion] = useState(0);
 
   // Payment Recording Modal
   const [isPayModalOpen, setIsPayModalOpen] = useState(false);
@@ -36,6 +40,19 @@ export default function CenterAdminFeesPage() {
   const [payAmount, setPayAmount] = useState<number | ''>('');
   const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
   const [payRemarks, setPayRemarks] = useState('');
+
+  // Edit Existing Payment Modal
+  const [isEditPaymentModalOpen, setIsEditPaymentModalOpen] = useState(false);
+  const [editingPayment, setEditingPayment] = useState<FeePayment | null>(null);
+  const [editPaymentAmount, setEditPaymentAmount] = useState<number | ''>('');
+  const [editPaymentDate, setEditPaymentDate] = useState('');
+  const [editPaymentRemarks, setEditPaymentRemarks] = useState('');
+
+  // Reset Fee to Unpaid confirmation modal
+  const [resetUnpaidStudent, setResetUnpaidStudent] = useState<{ student: Student; month: string } | null>(null);
+
+  // Delete Individual Payment confirmation modal
+  const [deletePaymentId, setDeletePaymentId] = useState<string | null>(null);
 
   // Fee Adjustment Modal (editing expected fee for a month)
   const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
@@ -48,15 +65,29 @@ export default function CenterAdminFeesPage() {
 
   const activeStudents = useMemo(() => {
     return dataService.getStudents(centerId).filter((s) => s.status === 'Active');
-  }, [centerId, localVersion]);
+  }, [centerId, dataVersion]);
+
+  // Target month derived from selectedDate when filterMode is 'date'
+  const activeMonth = useMemo(() => {
+    if (filterMode === 'date') {
+      return selectedDate.substring(0, 7);
+    }
+    return selectedMonth;
+  }, [filterMode, selectedDate, selectedMonth]);
 
   const monthlyFees = useMemo(() => {
-    return dataService.getMonthlyFees(centerId, selectedMonth);
-  }, [centerId, selectedMonth, localVersion]);
+    return dataService.getMonthlyFees(centerId, activeMonth);
+  }, [centerId, activeMonth, dataVersion]);
 
   const feePayments = useMemo(() => {
-    return dataService.getFeePayments(centerId, selectedMonth);
-  }, [centerId, selectedMonth, localVersion]);
+    let list = dataService.getFeePayments(centerId);
+    if (filterMode === 'month') {
+      list = list.filter((p) => p.month === selectedMonth);
+    } else {
+      list = list.filter((p) => p.paymentDate === selectedDate);
+    }
+    return list;
+  }, [centerId, filterMode, selectedMonth, selectedDate, dataVersion]);
 
   // Merge active students with their monthly fee records
   const studentFeeRows = useMemo(() => {
@@ -103,7 +134,7 @@ export default function CenterAdminFeesPage() {
     const row = studentFeeRows.find((r) => r.student.id === st.id);
     setSelectedStudentForPay(st);
     setPayAmount(row ? row.outstandingAmount || row.expectedFee : st.defaultFee);
-    setPayDate(new Date().toISOString().split('T')[0]);
+    setPayDate(filterMode === 'date' ? selectedDate : new Date().toISOString().split('T')[0]);
     setPayRemarks('');
     setIsPayModalOpen(true);
   };
@@ -115,16 +146,74 @@ export default function CenterAdminFeesPage() {
     dataService.recordFeePayment({
       centerId,
       studentId: selectedStudentForPay.id,
-      month: selectedMonth,
+      month: activeMonth,
       amount: Number(payAmount),
       paymentDate: payDate,
       remarks: payRemarks,
       recordedBy: adminUser?.name || 'Centre Admin',
     });
 
-    setLocalVersion((v) => v + 1);
     setIsPayModalOpen(false);
     refreshData();
+  };
+
+  const handleOpenEditLatestPayment = (st: Student) => {
+    const payments = dataService.getFeePayments(centerId, activeMonth).filter((p) => p.studentId === st.id);
+    if (payments.length > 0) {
+      const latest = payments[payments.length - 1];
+      setEditingPayment(latest);
+      setEditPaymentAmount(latest.amount);
+      setEditPaymentDate(latest.paymentDate);
+      setEditPaymentRemarks(latest.remarks || '');
+      setIsEditPaymentModalOpen(true);
+    }
+  };
+
+  const handleOpenEditSpecificPayment = (p: FeePayment) => {
+    setEditingPayment(p);
+    setEditPaymentAmount(p.amount);
+    setEditPaymentDate(p.paymentDate);
+    setEditPaymentRemarks(p.remarks || '');
+    setIsEditPaymentModalOpen(true);
+  };
+
+  const handleSaveEditPayment = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPayment || !editPaymentAmount || Number(editPaymentAmount) <= 0) return;
+
+    dataService.updateFeePayment(
+      editingPayment.id,
+      {
+        amount: Number(editPaymentAmount),
+        paymentDate: editPaymentDate,
+        remarks: editPaymentRemarks,
+      },
+      adminUser?.name || 'Centre Admin'
+    );
+
+    setIsEditPaymentModalOpen(false);
+    refreshData();
+  };
+
+  const handleConfirmResetUnpaid = () => {
+    if (resetUnpaidStudent) {
+      dataService.resetStudentFeeToUnpaid(
+        centerId,
+        resetUnpaidStudent.student.id,
+        resetUnpaidStudent.month,
+        adminUser?.name || 'Centre Admin'
+      );
+      setResetUnpaidStudent(null);
+      refreshData();
+    }
+  };
+
+  const handleConfirmDeletePayment = () => {
+    if (deletePaymentId) {
+      dataService.deleteFeePayment(deletePaymentId, adminUser?.name || 'Centre Admin');
+      setDeletePaymentId(null);
+      refreshData();
+    }
   };
 
   const handleOpenAdjust = (st: Student) => {
@@ -142,12 +231,11 @@ export default function CenterAdminFeesPage() {
     dataService.updateStudentMonthlyFee({
       centerId,
       studentId: adjustStudent.id,
-      month: selectedMonth,
+      month: activeMonth,
       expectedFee: Number(newExpectedFee),
       remarks: adjustRemarks,
     });
 
-    setLocalVersion((v) => v + 1);
     setIsAdjustModalOpen(false);
     refreshData();
   };
@@ -167,14 +255,41 @@ export default function CenterAdminFeesPage() {
           </div>
 
           <div className="flex items-center space-x-2 bg-white px-3 py-2 rounded-xl border border-cre-border shadow-xs text-xs font-semibold text-slate-800">
-            <Calendar className="w-4 h-4 text-cre-navy" />
-            <span className="text-slate-400 font-medium">Month:</span>
-            <input
-              type="month"
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              className="bg-transparent focus:outline-hidden cursor-pointer"
-            />
+            <div className="flex items-center bg-slate-100 rounded-lg p-0.5 mr-1 shrink-0">
+              <button
+                type="button"
+                onClick={() => setFilterMode('month')}
+                className={`px-2 py-1 text-[10px] font-bold rounded-md transition-all ${
+                  filterMode === 'month' ? 'bg-cre-navy text-white' : 'text-slate-600'
+                }`}
+              >
+                By Month
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterMode('date')}
+                className={`px-2 py-1 text-[10px] font-bold rounded-md transition-all ${
+                  filterMode === 'date' ? 'bg-cre-navy text-white' : 'text-slate-600'
+                }`}
+              >
+                By Date
+              </button>
+            </div>
+            {filterMode === 'month' ? (
+              <input
+                type="month"
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="bg-transparent focus:outline-hidden cursor-pointer"
+              />
+            ) : (
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="bg-transparent focus:outline-hidden cursor-pointer"
+              />
+            )}
           </div>
         </div>
 
@@ -182,7 +297,7 @@ export default function CenterAdminFeesPage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-white p-5 rounded-2xl border border-cre-border shadow-xs">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-              Total Expected ({selectedMonth})
+              Total Expected ({activeMonth})
             </span>
             <div className="mt-2 text-2xl font-black text-cre-navy">
               {formatCurrency(totalExpected)}
@@ -336,13 +451,37 @@ export default function CenterAdminFeesPage() {
                           <History className="w-4 h-4" />
                         </button>
 
+                        {/* Edit Payment Button (if paid) */}
+                        {r.paidAmount > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditLatestPayment(r.student)}
+                            className="p-1.5 text-slate-500 hover:text-cre-navy hover:bg-slate-100 rounded-lg transition-colors"
+                            title="Edit Payment Amount / Details"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+
+                        {/* Reset to Unpaid Button (if marked as Paid or partially paid) */}
+                        {r.paidAmount > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setResetUnpaidStudent({ student: r.student, month: activeMonth })}
+                            className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Reset Fee Status to Unpaid"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+
                         <button
                           type="button"
                           onClick={() => handleOpenPayment(r.student)}
                           className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-cre-green hover:bg-cre-green-hover shadow-xs transition-colors inline-flex items-center"
                         >
                           <Plus className="w-3.5 h-3.5 mr-1" />
-                          Pay
+                          {r.status === 'Paid' ? 'Pay More' : 'Pay'}
                         </button>
                       </div>
                     </td>
@@ -387,7 +526,7 @@ export default function CenterAdminFeesPage() {
               <form onSubmit={handleSavePayment} className="mt-4 space-y-4">
                 <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs flex justify-between">
                   <span className="text-slate-500">Target Month:</span>
-                  <span className="font-bold text-cre-navy">{selectedMonth}</span>
+                  <span className="font-bold text-cre-navy">{activeMonth}</span>
                 </div>
 
                 <div>
@@ -453,6 +592,90 @@ export default function CenterAdminFeesPage() {
           </div>
         )}
 
+        {/* EDIT PAYMENT MODAL */}
+        {isEditPaymentModalOpen && editingPayment && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-cre-border">
+              <div className="flex items-center justify-between pb-3 border-b border-cre-border">
+                <div className="flex items-center space-x-2.5">
+                  <div className="p-2 rounded-xl bg-cre-navy text-white">
+                    <Edit2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-cre-navy">Edit Fee Payment</h3>
+                    <p className="text-[11px] text-slate-500">For Month: {editingPayment.month}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsEditPaymentModalOpen(false)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveEditPayment} className="mt-4 space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Correct Amount (₹) *
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min={1}
+                    value={editPaymentAmount}
+                    onChange={(e) => setEditPaymentAmount(Number(e.target.value))}
+                    className="w-full px-3.5 py-2 text-sm border border-cre-border rounded-xl font-black text-cre-navy focus:ring-2 focus:ring-cre-navy focus:outline-hidden"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Payment Date *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={editPaymentDate}
+                    onChange={(e) => setEditPaymentDate(e.target.value)}
+                    className="w-full px-3.5 py-2 text-xs border border-cre-border rounded-xl font-medium"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Remarks
+                  </label>
+                  <input
+                    type="text"
+                    value={editPaymentRemarks}
+                    onChange={(e) => setEditPaymentRemarks(e.target.value)}
+                    placeholder="e.g. Corrected cash amount"
+                    className="w-full px-3.5 py-2 text-xs border border-cre-border rounded-xl focus:ring-2 focus:ring-cre-navy focus:outline-hidden"
+                  />
+                </div>
+
+                <div className="pt-3 border-t border-cre-border flex items-center justify-end space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditPaymentModalOpen(false)}
+                    className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 text-xs font-bold text-white bg-cre-navy hover:bg-cre-navy-hover rounded-xl shadow-xs"
+                  >
+                    Update Payment
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
         {/* FEE ADJUSTMENT MODAL */}
         {isAdjustModalOpen && adjustStudent && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
@@ -470,7 +693,7 @@ export default function CenterAdminFeesPage() {
 
               <form onSubmit={handleSaveAdjust} className="mt-4 space-y-3">
                 <p className="text-xs text-slate-600">
-                  Adjust expected fee for <span className="font-bold">{adjustStudent.name}</span> for month <span className="font-bold text-cre-navy">{selectedMonth}</span>:
+                  Adjust expected fee for <span className="font-bold">{adjustStudent.name}</span> for month <span className="font-bold text-cre-navy">{activeMonth}</span>:
                 </p>
 
                 <div>
@@ -544,12 +767,30 @@ export default function CenterAdminFeesPage() {
                     return <p className="py-6 text-center text-xs text-slate-400">No payment transactions recorded.</p>;
                   }
                   return payments.map(p => (
-                    <div key={p.id} className="py-2.5 flex items-center justify-between text-xs">
+                    <div key={p.id} className="py-2.5 flex items-center justify-between text-xs hover:bg-slate-50 px-2 rounded-lg">
                       <div>
                         <span className="font-bold text-slate-800 block">Fee for Month: {p.month}</span>
                         <span className="text-[10px] text-slate-400">Date: {p.paymentDate} • {p.remarks || 'Cash'} • By: {p.recordedBy}</span>
                       </div>
-                      <span className="font-bold text-cre-green">+{formatCurrency(p.amount)}</span>
+                      <div className="flex items-center space-x-2">
+                        <span className="font-bold text-cre-green">+{formatCurrency(p.amount)}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditSpecificPayment(p)}
+                          className="p-1 text-slate-400 hover:text-cre-navy hover:bg-slate-200 rounded-sm"
+                          title="Edit Payment"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeletePaymentId(p.id)}
+                          className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-sm"
+                          title="Delete Payment"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                   ));
                 })()}
@@ -567,6 +808,28 @@ export default function CenterAdminFeesPage() {
             </div>
           </div>
         )}
+
+        {/* CONFIRM RESET TO UNPAID MODAL */}
+        <ConfirmModal
+          isOpen={!!resetUnpaidStudent}
+          title="Reset Fee to Unpaid"
+          message={`Are you sure you want to reset fee status to Unpaid for "${resetUnpaidStudent?.student.name}" for month ${resetUnpaidStudent?.month}? This will remove all payments recorded for this month.`}
+          confirmText="Reset to Unpaid"
+          isDanger={true}
+          onConfirm={handleConfirmResetUnpaid}
+          onCancel={() => setResetUnpaidStudent(null)}
+        />
+
+        {/* CONFIRM DELETE INDIVIDUAL PAYMENT MODAL */}
+        <ConfirmModal
+          isOpen={!!deletePaymentId}
+          title="Delete Fee Payment Record"
+          message="Are you sure you want to permanently delete this payment transaction? This will automatically recalculate the student's monthly fee status."
+          confirmText="Delete Payment"
+          isDanger={true}
+          onConfirm={handleConfirmDeletePayment}
+          onCancel={() => setDeletePaymentId(null)}
+        />
       </div>
     </AppShell>
   );

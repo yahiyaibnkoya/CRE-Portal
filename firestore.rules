@@ -29,6 +29,8 @@ service cloud.firestore {
     match /exams/{id} { allow read, write: if true; }
     match /examMarks/{id} { allow read, write: if true; }
     match /donatedContacts/{id} { allow read, write: if true; }
+    match /faculties/{id} { allow read, write: if true; }
+    match /classNotHeld/{id} { allow read, write: if true; }
     match /settings/{id} { allow read, write: if true; }
 
     // Audit logs: Append-only ledger! Cannot be modified or deleted once logged!

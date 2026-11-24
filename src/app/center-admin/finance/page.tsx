@@ -15,6 +15,7 @@ import {
   Plus,
   Calendar,
   Trash2,
+  Edit2,
   CheckCircle,
   X,
   IndianRupee,
@@ -26,13 +27,19 @@ export default function CenterAdminFinancePage() {
   const { activeCenter, adminUser, refreshData } = useAuth();
   const centerId = activeCenter?.id || '';
 
+  const [filterMode, setFilterMode] = useState<'month' | 'date'>('month');
   const [selectedMonth, setSelectedMonth] = useState('2026-11');
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [localVersion, setLocalVersion] = useState(0);
 
   // Modal States
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
-  const [isDonationModalOpen, setIsDonationModalOpen] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [deleteExpenseId, setDeleteExpenseId] = useState<string | null>(null);
+
+  const [isDonationModalOpen, setIsDonationModalOpen] = useState(false);
+  const [editingDonation, setEditingDonation] = useState<Donation | null>(null);
+  const [deleteDonationId, setDeleteDonationId] = useState<string | null>(null);
 
   // Expense Form State
   const [expenseType, setExpenseType] = useState<'weekly' | 'other'>('weekly');
@@ -50,21 +57,39 @@ export default function CenterAdminFinancePage() {
   const [donationDate, setDonationDate] = useState(new Date().toISOString().split('T')[0]);
   const [donationRemarks, setDonationRemarks] = useState('');
 
-  const summary = useMemo(() => {
-    return dataService.getFinancialSummary(centerId, selectedMonth);
-  }, [centerId, selectedMonth, localVersion]);
+  const activePeriodFilter = filterMode === 'month' ? selectedMonth : undefined;
 
+  const summary = useMemo(() => {
+    return dataService.getFinancialSummary(centerId, activePeriodFilter);
+  }, [centerId, activePeriodFilter, localVersion]);
+
+  const rawFeePayments = useMemo(() => {
+    return dataService.getFeePayments(centerId, activePeriodFilter);
+  }, [centerId, activePeriodFilter, localVersion]);
+
+  const rawDonations = useMemo(() => {
+    return dataService.getDonations(centerId, activePeriodFilter);
+  }, [centerId, activePeriodFilter, localVersion]);
+
+  const rawExpenses = useMemo(() => {
+    return dataService.getExpenses(centerId, activePeriodFilter);
+  }, [centerId, activePeriodFilter, localVersion]);
+
+  // If filterMode === 'date', filter items strictly by exact date
   const feePayments = useMemo(() => {
-    return dataService.getFeePayments(centerId, selectedMonth);
-  }, [centerId, selectedMonth, localVersion]);
+    if (filterMode === 'date') return rawFeePayments.filter((p) => p.paymentDate === selectedDate);
+    return rawFeePayments;
+  }, [rawFeePayments, filterMode, selectedDate]);
 
   const donations = useMemo(() => {
-    return dataService.getDonations(centerId, selectedMonth);
-  }, [centerId, selectedMonth, localVersion]);
+    if (filterMode === 'date') return rawDonations.filter((d) => d.date === selectedDate);
+    return rawDonations;
+  }, [rawDonations, filterMode, selectedDate]);
 
   const expenses = useMemo(() => {
-    return dataService.getExpenses(centerId, selectedMonth);
-  }, [centerId, selectedMonth, localVersion]);
+    if (filterMode === 'date') return rawExpenses.filter((e) => e.date === selectedDate);
+    return rawExpenses;
+  }, [rawExpenses, filterMode, selectedDate]);
 
   const weeklyExpenses = useMemo(() => {
     return expenses.filter((e) => e.type === 'weekly');
@@ -75,6 +100,7 @@ export default function CenterAdminFinancePage() {
   }, [expenses]);
 
   const handleOpenAddExpense = () => {
+    setEditingExpense(null);
     setExpenseType('weekly');
     setCategory('Faculty TA');
     setCustomCategory('');
@@ -86,23 +112,52 @@ export default function CenterAdminFinancePage() {
     setIsExpenseModalOpen(true);
   };
 
+  const handleOpenEditExpense = (exp: Expense) => {
+    setEditingExpense(exp);
+    setExpenseType(exp.type);
+    setCategory(exp.category);
+    setCustomCategory('');
+    setTitle(exp.title || '');
+    setAmount(exp.amount);
+    setExpDate(exp.date);
+    setSessionDate(exp.sessionDate || exp.date);
+    setDescription(exp.description || '');
+    setIsExpenseModalOpen(true);
+  };
+
   const handleSaveExpense = (e: React.FormEvent) => {
     e.preventDefault();
     if (!amount || Number(amount) <= 0 || !centerId) return;
 
     const finalCategory = category === 'Other' ? (customCategory || 'Misc') : category;
 
-    dataService.addExpense({
-      centerId,
-      type: expenseType,
-      sessionDate: expenseType === 'weekly' ? sessionDate : undefined,
-      category: finalCategory,
-      title: expenseType === 'other' ? title : undefined,
-      amount: Number(amount),
-      date: expDate,
-      description,
-      recordedBy: adminUser?.name || 'Centre Admin',
-    });
+    if (editingExpense) {
+      dataService.updateExpense(
+        editingExpense.id,
+        {
+          type: expenseType,
+          sessionDate: expenseType === 'weekly' ? sessionDate : undefined,
+          category: finalCategory,
+          title: expenseType === 'other' ? title : undefined,
+          amount: Number(amount),
+          date: expDate,
+          description,
+        },
+        adminUser?.name || 'Centre Admin'
+      );
+    } else {
+      dataService.addExpense({
+        centerId,
+        type: expenseType,
+        sessionDate: expenseType === 'weekly' ? sessionDate : undefined,
+        category: finalCategory,
+        title: expenseType === 'other' ? title : undefined,
+        amount: Number(amount),
+        date: expDate,
+        description,
+        recordedBy: adminUser?.name || 'Centre Admin',
+      });
+    }
 
     setLocalVersion((v) => v + 1);
     setIsExpenseModalOpen(false);
@@ -121,21 +176,64 @@ export default function CenterAdminFinancePage() {
     refreshData();
   };
 
+  const handleOpenAddDonation = () => {
+    setEditingDonation(null);
+    setDonorName('');
+    setDonationAmount('');
+    setDonationDate(new Date().toISOString().split('T')[0]);
+    setDonationRemarks('');
+    setIsDonationModalOpen(true);
+  };
+
+  const handleOpenEditDonation = (d: Donation) => {
+    setEditingDonation(d);
+    setDonorName(d.donorName || '');
+    setDonationAmount(d.amount);
+    setDonationDate(d.date);
+    setDonationRemarks(d.remarks || '');
+    setIsDonationModalOpen(true);
+  };
+
   const handleSaveDonation = (e: React.FormEvent) => {
     e.preventDefault();
     if (!donationAmount || Number(donationAmount) <= 0 || !centerId) return;
 
-    dataService.addDonation({
-      centerId,
-      donorName: donorName || 'Anonymous Well-wisher',
-      amount: Number(donationAmount),
-      date: donationDate,
-      remarks: donationRemarks,
-      recordedBy: adminUser?.name || 'Centre Admin',
-    });
+    if (editingDonation) {
+      dataService.updateDonation(
+        editingDonation.id,
+        {
+          donorName: donorName || 'Anonymous Well-wisher',
+          amount: Number(donationAmount),
+          date: donationDate,
+          remarks: donationRemarks,
+        },
+        adminUser?.name || 'Centre Admin'
+      );
+    } else {
+      dataService.addDonation({
+        centerId,
+        donorName: donorName || 'Anonymous Well-wisher',
+        amount: Number(donationAmount),
+        date: donationDate,
+        remarks: donationRemarks,
+        recordedBy: adminUser?.name || 'Centre Admin',
+      });
+    }
 
     setLocalVersion((v) => v + 1);
     setIsDonationModalOpen(false);
+    refreshData();
+  };
+
+  const handleDeleteDonation = (id: string) => {
+    setDeleteDonationId(id);
+  };
+
+  const handleConfirmDeleteDonation = () => {
+    if (!deleteDonationId) return;
+    dataService.deleteDonation(deleteDonationId, adminUser?.name || 'Centre Admin');
+    setLocalVersion((v) => v + 1);
+    setDeleteDonationId(null);
     refreshData();
   };
 
@@ -153,26 +251,55 @@ export default function CenterAdminFinancePage() {
             </p>
           </div>
 
-          <div className="flex items-center space-x-2">
-            <div className="bg-white px-3 py-2 rounded-xl border border-cre-border shadow-xs text-xs font-semibold text-slate-800 flex items-center space-x-1.5">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Toggle Month vs Date */}
+            <div className="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200 text-xs">
+              <button
+                type="button"
+                onClick={() => setFilterMode('month')}
+                className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+                  filterMode === 'month'
+                    ? 'bg-white text-cre-navy shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                By Month
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterMode('date')}
+                className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+                  filterMode === 'date'
+                    ? 'bg-white text-cre-navy shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                By Date
+              </button>
+            </div>
+
+            <div className="bg-white px-3 py-1.5 rounded-xl border border-cre-border shadow-xs text-xs font-semibold text-slate-800 flex items-center space-x-1.5">
               <Calendar className="w-4 h-4 text-cre-navy" />
-              <input
-                type="month"
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                className="bg-transparent focus:outline-hidden cursor-pointer"
-              />
+              {filterMode === 'month' ? (
+                <input
+                  type="month"
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  className="bg-transparent focus:outline-hidden cursor-pointer"
+                />
+              ) : (
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="bg-transparent focus:outline-hidden cursor-pointer font-bold"
+                />
+              )}
             </div>
 
             <button
               type="button"
-              onClick={() => {
-                setDonorName('');
-                setDonationAmount('');
-                setDonationDate(new Date().toISOString().split('T')[0]);
-                setDonationRemarks('');
-                setIsDonationModalOpen(true);
-              }}
+              onClick={handleOpenAddDonation}
               className="px-3.5 py-2 rounded-xl text-xs font-bold text-cre-navy bg-cre-navy-light hover:bg-cre-navy hover:text-white transition-all shadow-xs"
             >
               + Donation
@@ -281,7 +408,7 @@ export default function CenterAdminFinancePage() {
               })}
 
               {donations.map((d, idx) => (
-                <div key={d.id} className="p-3.5 flex items-center justify-between hover:bg-slate-50 text-xs bg-amber-50/20">
+                <div key={d.id} className="p-3.5 flex items-center justify-between hover:bg-slate-50 text-xs bg-amber-50/20 group">
                   <div className="flex items-center space-x-2.5">
                     <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-amber-100/70 text-amber-700 shrink-0">
                       #{feePayments.length + idx + 1}
@@ -293,13 +420,31 @@ export default function CenterAdminFinancePage() {
                       </span>
                     </div>
                   </div>
-                  <span className="font-bold text-cre-navy">+{formatCurrency(d.amount)}</span>
+                  <div className="flex items-center space-x-2">
+                    <span className="font-bold text-cre-navy">+{formatCurrency(d.amount)}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEditDonation(d)}
+                      className="p-1 text-slate-400 hover:text-cre-navy rounded-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Edit donation"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteDonation(d.id)}
+                      className="p-1 text-slate-400 hover:text-red-600 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Delete donation"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               ))}
 
               {feePayments.length === 0 && donations.length === 0 && (
                 <div className="p-8 text-center text-xs text-slate-400">
-                  No income entries recorded for {selectedMonth}.
+                  No income entries recorded for selected period.
                 </div>
               )}
             </div>
@@ -310,7 +455,7 @@ export default function CenterAdminFinancePage() {
             <div className="p-4 border-b border-cre-border bg-slate-50 flex items-center justify-between">
               <div>
                 <h3 className="text-xs font-bold text-cre-navy uppercase tracking-wider">
-                  Expense Register ({selectedMonth})
+                  Expense Register ({filterMode === 'month' ? selectedMonth : selectedDate})
                 </h3>
                 <span className="text-[10px] text-slate-400">
                   Total Expenses: <span className="font-bold text-red-600">{formatCurrency(summary.totalExpenses)}</span>
@@ -340,8 +485,16 @@ export default function CenterAdminFinancePage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-2">
                     <span className="font-bold text-slate-800">-{formatCurrency(e.amount)}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEditExpense(e)}
+                      className="p-1 text-slate-400 hover:text-cre-navy rounded-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Edit expense"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
                     <button
                       type="button"
                       onClick={() => handleDeleteExpense(e.id)}
@@ -368,7 +521,7 @@ export default function CenterAdminFinancePage() {
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
             <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-cre-border">
               <div className="flex items-center justify-between pb-3 border-b border-cre-border">
-                <h3 className="text-sm font-bold text-cre-navy">Record Expense</h3>
+                <h3 className="text-sm font-bold text-cre-navy">{editingExpense ? 'Edit Expense' : 'Record Expense'}</h3>
                 <button
                   type="button"
                   onClick={() => setIsExpenseModalOpen(false)}
@@ -505,7 +658,7 @@ export default function CenterAdminFinancePage() {
                     type="submit"
                     className="px-5 py-2 text-xs font-bold text-white bg-cre-green hover:bg-cre-green-hover rounded-xl shadow-xs"
                   >
-                    Save Expense
+                    {editingExpense ? 'Update Expense' : 'Save Expense'}
                   </button>
                 </div>
               </form>
@@ -518,7 +671,7 @@ export default function CenterAdminFinancePage() {
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
             <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-cre-border">
               <div className="flex items-center justify-between pb-3 border-b border-cre-border">
-                <h3 className="text-sm font-bold text-cre-navy">Record Voluntary Donation</h3>
+                <h3 className="text-sm font-bold text-cre-navy">{editingDonation ? 'Edit Voluntary Donation' : 'Record Voluntary Donation'}</h3>
                 <button
                   type="button"
                   onClick={() => setIsDonationModalOpen(false)}
@@ -597,7 +750,7 @@ export default function CenterAdminFinancePage() {
                     type="submit"
                     className="px-5 py-2 text-xs font-bold text-white bg-cre-green hover:bg-cre-green-hover rounded-xl shadow-xs"
                   >
-                    Save Donation
+                    {editingDonation ? 'Update Donation' : 'Save Donation'}
                   </button>
                 </div>
               </form>
@@ -614,6 +767,17 @@ export default function CenterAdminFinancePage() {
           isDanger={true}
           onConfirm={handleConfirmDeleteExpense}
           onCancel={() => setDeleteExpenseId(null)}
+        />
+
+        {/* Confirm Delete Donation Modal */}
+        <ConfirmModal
+          isOpen={!!deleteDonationId}
+          title="Delete Donation Record"
+          message="Are you sure you want to delete this donation record? This will deduct the contribution from centre accounts."
+          confirmText="Delete Donation"
+          isDanger={true}
+          onConfirm={handleConfirmDeleteDonation}
+          onCancel={() => setDeleteDonationId(null)}
         />
       </div>
     </AppShell>

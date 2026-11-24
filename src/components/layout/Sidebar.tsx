@@ -42,6 +42,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpenMobile = false, onCloseM
     { name: 'Centre Administrators', href: '/super-admin/admins', icon: ShieldCheck },
     { name: 'Faculties', href: '/super-admin/faculties', icon: GraduationCap },
     { name: 'Students', href: '/super-admin/students', icon: Users },
+    { name: 'Attendance', href: '/super-admin/attendance', icon: CalendarCheck },
     { name: 'Financial Overview', href: '/super-admin/finance', icon: Wallet },
     { name: 'Donations', href: '/super-admin/donations', icon: HeartHandshake },
     { name: 'Reports', href: '/super-admin/reports', icon: FileSpreadsheet },
@@ -79,7 +80,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpenMobile = false, onCloseM
       : studentNav;
 
   const content = (
-    <div className="flex flex-col h-full bg-white border-r border-cre-border">
+    <div className="flex flex-col h-full bg-white border-r border-cre-border transition-all duration-300 ease-in-out">
       {/* Centre context banner */}
       {activeCenter && (
         <div className="p-4 border-b border-cre-border bg-slate-50/70">
@@ -111,10 +112,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpenMobile = false, onCloseM
               key={item.name}
               href={item.href}
               onClick={onCloseMobile}
-              className={`flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-semibold transition-all ${
+              className={`flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
                 isActive
-                  ? 'bg-cre-green-light text-cre-green font-bold shadow-xs border border-cre-green/20'
-                  : 'text-slate-600 hover:text-cre-navy hover:bg-slate-50'
+                  ? 'bg-cre-green-light text-cre-green font-bold shadow-xs border border-cre-green/20 translate-x-1'
+                  : 'text-slate-600 hover:text-cre-navy hover:bg-slate-50 hover:translate-x-0.5'
               }`}
             >
               <div className="flex items-center space-x-3">
@@ -142,33 +143,41 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpenMobile = false, onCloseM
 
   return (
     <>
-      {/* Desktop Sidebar */}
-      <aside className="hidden lg:block w-64 shrink-0 h-[calc(100vh-4.5rem)] sticky top-18 z-30">
+      {/* Desktop Sidebar with subtle slide entry */}
+      <aside className="hidden lg:block w-64 shrink-0 h-[calc(100vh-4.5rem)] sticky top-18 z-30 transition-transform duration-300 ease-in-out">
         {content}
       </aside>
 
-      {/* Mobile Drawer Overlay */}
-      {isOpenMobile && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <div
-            className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity"
-            onClick={onCloseMobile}
-          />
-          <div className="fixed inset-y-0 left-0 w-72 max-w-[85vw] bg-white shadow-xl flex flex-col z-50">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-cre-border">
-              <span className="text-xs font-bold text-cre-navy">Navigation Menu</span>
-              <button
-                type="button"
-                onClick={onCloseMobile}
-                className="p-1 rounded-md text-slate-500 hover:bg-slate-100"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto">{content}</div>
+      {/* Mobile Drawer Overlay with fluid sliding animation */}
+      <div
+        className={`fixed inset-0 z-50 lg:hidden transition-all duration-300 ease-in-out ${
+          isOpenMobile ? 'visible pointer-events-auto' : 'invisible pointer-events-none'
+        }`}
+      >
+        <div
+          className={`fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity duration-300 ease-in-out ${
+            isOpenMobile ? 'opacity-100' : 'opacity-0'
+          }`}
+          onClick={onCloseMobile}
+        />
+        <div
+          className={`fixed inset-y-0 left-0 w-72 max-w-[85vw] bg-white shadow-2xl flex flex-col z-50 transform transition-transform duration-300 ease-in-out ${
+            isOpenMobile ? 'translate-x-0' : '-translate-x-full'
+          }`}
+        >
+          <div className="flex items-center justify-between px-4 py-3 border-b border-cre-border">
+            <span className="text-xs font-bold text-cre-navy">Navigation Menu</span>
+            <button
+              type="button"
+              onClick={onCloseMobile}
+              className="p-1 rounded-md text-slate-500 hover:bg-slate-100"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
+          <div className="flex-1 overflow-y-auto">{content}</div>
         </div>
-      )}
+      </div>
     </>
   );
 };

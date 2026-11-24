@@ -177,7 +177,7 @@ export type FacultyStatus = 'Approved' | 'Pending';
 export interface Faculty {
   id: string;
   name: string;
-  phone: string;
+  phone?: string;
   place?: string;
   qualification?: string;
   status: FacultyStatus;
@@ -185,6 +185,16 @@ export interface Faculty {
   notes?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ClassNotHeld {
+  id: string;
+  centerId: string;
+  date: string; // YYYY-MM-DD
+  reason: string;
+  remarks?: string;
+  recordedBy: string;
+  createdAt: string;
 }
 
 export interface SystemSettings {

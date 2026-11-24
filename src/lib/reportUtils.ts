@@ -9,6 +9,33 @@ export interface ReportHeaderInfo {
 }
 
 /**
+ * Strictly formats a date string to DD-MM-YYYY (e.g. 24-11-2026)
+ */
+export function formatDateDMY(dateStr?: string): string {
+  if (!dateStr) return '—';
+  const trimmed = dateStr.trim();
+  const parts = trimmed.split('-');
+  if (parts.length === 3 && parts[0].length === 4) {
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  }
+  if (parts.length === 2 && parts[0].length === 4) {
+    return `${parts[1]}-${parts[0]}`;
+  }
+  try {
+    const d = new Date(trimmed);
+    if (!isNaN(d.getTime())) {
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const yyyy = d.getFullYear();
+      return `${dd}-${mm}-${yyyy}`;
+    }
+  } catch {
+    // fallback
+  }
+  return trimmed;
+}
+
+/**
  * Copies plain/WhatsApp formatted text to clipboard
  */
 export async function copyToClipboard(text: string): Promise<boolean> {
@@ -143,7 +170,7 @@ export async function generatePdfReport(params: {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   doc.setTextColor(100, 116, 139);
-  doc.text(`Centre: ${params.centerName}   |   Period: ${params.period}`, 14, currentY);
+  doc.text(`Centre: ${params.centerName}   |   Period: ${formatDateDMY(params.period)}`, 14, currentY);
 
   currentY += 6;
 

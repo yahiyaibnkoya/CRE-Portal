@@ -6,7 +6,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { useAuth } from '@/context/AuthContext';
 import { dataService } from '@/lib/dataService';
 import { formatCurrency } from '@/lib/constants';
-import { copyToClipboard, getWhatsAppShareUrl, generatePdfReport } from '@/lib/reportUtils';
+import { copyToClipboard, getWhatsAppShareUrl, generatePdfReport, formatDateDMY } from '@/lib/reportUtils';
 import {
   FileText,
   Copy,
@@ -217,17 +217,36 @@ function CenterReportsContent() {
     });
   }, [examMarks, genderFilter, searchQuery]);
 
-  // Dynamic WhatsApp formatted text respecting column visibility
+  const filteredPresentList = useMemo(() => {
+    return filteredClassRecords
+      .filter((r) => r.status === 'Present')
+      .map((r) => ({ student: dataService.getStudentById(r.studentId), record: r }));
+  }, [filteredClassRecords]);
+
+  const filteredAbsentList = useMemo(() => {
+    return filteredClassRecords
+      .filter((r) => r.status === 'Absent')
+      .map((r) => ({ student: dataService.getStudentById(r.studentId), record: r }));
+  }, [filteredClassRecords]);
+
+  const filteredLeaveList = useMemo(() => {
+    return filteredClassRecords
+      .filter((r) => r.status === 'Leave')
+      .map((r) => ({ student: dataService.getStudentById(r.studentId), record: r }));
+  }, [filteredClassRecords]);
+
+  // Dynamic WhatsApp formatted text respecting column visibility and active filters
   const whatsAppText = useMemo(() => {
     if (reportType === 'class_attendance') {
-      const { presentList, absentList, leaveList, total, turnoutRate } = classAttendanceData;
+      const total = filteredClassRecords.length;
+      const turnoutRate = total > 0 ? Math.round((filteredPresentList.length / total) * 100) : 0;
 
-      let text = `*CRE – CLASS ATTENDANCE REPORT*\n*Wisdom Islamic Students Organization*\n\n*Centre:* ${centerName}\n*Class Date:* ${selectedDate}\n*Attendance Turnout:* ${turnoutRate}% (${presentList.length}/${total} Present)\n\n*SUMMARY*\nTotal Students: ${total}\nPresent: ${presentList.length}\nAbsent: ${absentList.length}\nOn Leave: ${leaveList.length}\n\n*PRESENT STUDENTS (${presentList.length}):*`;
+      let text = `*CRE – CLASS ATTENDANCE REPORT*\n*Wisdom Islamic Students Organization*\n\n*Centre:* ${centerName}\n*Class Date:* ${formatDateDMY(selectedDate)}\n*Attendance Turnout:* ${turnoutRate}% (${filteredPresentList.length}/${total} Present)\n\n*SUMMARY*\nTotal Filtered: ${total}\nPresent: ${filteredPresentList.length}\nAbsent: ${filteredAbsentList.length}\nOn Leave: ${filteredLeaveList.length}\n\n*PRESENT STUDENTS (${filteredPresentList.length}):*`;
 
-      if (presentList.length === 0) {
+      if (filteredPresentList.length === 0) {
         text += '\n- None';
       } else {
-        presentList.forEach((item, idx) => {
+        filteredPresentList.forEach((item, idx) => {
           const admStr = showAdmNo && item.student?.admissionNumber ? ` (${item.student.admissionNumber})` : '';
           const genderStr = showGender && item.student?.gender ? ` [${item.student.gender}]` : '';
           const placeStr = showPlace && item.student?.place ? ` - ${item.student.place}` : '';
@@ -235,11 +254,11 @@ function CenterReportsContent() {
         });
       }
 
-      text += `\n\n*ABSENT STUDENTS (${absentList.length}):*`;
-      if (absentList.length === 0) {
+      text += `\n\n*ABSENT STUDENTS (${filteredAbsentList.length}):*`;
+      if (filteredAbsentList.length === 0) {
         text += '\n- None';
       } else {
-        absentList.forEach((item, idx) => {
+        filteredAbsentList.forEach((item, idx) => {
           const admStr = showAdmNo && item.student?.admissionNumber ? ` (${item.student.admissionNumber})` : '';
           const genderStr = showGender && item.student?.gender ? ` [${item.student.gender}]` : '';
           const phone = item.student?.parentPhone || item.student?.studentPhone || '';
@@ -248,9 +267,9 @@ function CenterReportsContent() {
         });
       }
 
-      if (leaveList.length > 0) {
-        text += `\n\n*ON LEAVE (${leaveList.length}):*`;
-        leaveList.forEach((item, idx) => {
+      if (filteredLeaveList.length > 0) {
+        text += `\n\n*ON LEAVE (${filteredLeaveList.length}):*`;
+        filteredLeaveList.forEach((item, idx) => {
           const admStr = showAdmNo && item.student?.admissionNumber ? ` (${item.student.admissionNumber})` : '';
           const genderStr = showGender && item.student?.gender ? ` [${item.student.gender}]` : '';
           text += `\n${idx + 1}. ${item.student?.name || 'Student'}${genderStr}${admStr} - ${item.record.remarks || 'Sanctioned leave'}`;
@@ -261,18 +280,34 @@ function CenterReportsContent() {
     }
 
     if (reportType === 'fee') {
-      const paidCount = monthlyFees.filter((f) => f.status === 'Paid' || f.status === 'Advance / Excess').length;
-      const partialCount = monthlyFees.filter((f) => f.status === 'Partially Paid').length;
-      const unpaidCount = monthlyFees.filter((f) => f.status === 'Unpaid').length;
-      const expectedTotal = monthlyFees.reduce((acc, f) => acc + (f.expectedFee || 0), 0);
-      const collectedTotal = monthlyFees.reduce((acc, f) => acc + (f.paidAmount || 0), 0);
-      const outstandingTotal = monthlyFees.reduce((acc, f) => acc + (f.outstandingAmount || 0), 0);
+      const paidCount = filteredMonthlyFees.filter((f) => f.status === 'Paid' || f.status === 'Advance / Excess').length;
+      const partialCount = filteredMonthlyFees.filter((f) => f.status === 'Partially Paid').length;
+      const unpaidCount = filteredMonthlyFees.filter((f) => f.status === 'Unpaid').length;
+      const expectedTotal = filteredMonthlyFees.reduce((acc, f) => acc + (f.expectedFee || 0), 0);
+      const collectedTotal = filteredMonthlyFees.reduce((acc, f) => acc + (f.paidAmount || 0), 0);
+      const outstandingTotal = filteredMonthlyFees.reduce((acc, f) => acc + (f.outstandingAmount || 0), 0);
 
-      return `*CRE – MONTHLY FEE REPORT*\n*Wisdom Islamic Students Organization*\n\n*Centre:* ${centerName}\n*Month:* ${selectedMonth}\n\n*FEE SUMMARY*\nTotal Students: ${monthlyFees.length}\nPaid: ${paidCount}\nPartially Paid: ${partialCount}\nUnpaid: ${unpaidCount}\n\n*COLLECTION*\nExpected Amount: ${formatCurrency(expectedTotal)}\nCollected Amount: ${formatCurrency(collectedTotal)}\nOutstanding: ${formatCurrency(outstandingTotal)}`;
+      return `*CRE – MONTHLY FEE REPORT*\n*Wisdom Islamic Students Organization*\n\n*Centre:* ${centerName}\n*Month:* ${selectedMonth}\n\n*FEE SUMMARY*\nTotal Students: ${filteredMonthlyFees.length}\nPaid: ${paidCount}\nPartially Paid: ${partialCount}\nUnpaid: ${unpaidCount}\n\n*COLLECTION*\nExpected Amount: ${formatCurrency(expectedTotal)}\nCollected Amount: ${formatCurrency(collectedTotal)}\nOutstanding: ${formatCurrency(outstandingTotal)}`;
     }
 
     if (reportType === 'attendance') {
-      return `*CRE – MONTHLY ATTENDANCE STATEMENT*\n*Wisdom Islamic Students Organization*\n\n*Centre:* ${centerName}\n*Month:* ${selectedMonth}\n\n*ATTENDANCE SUMMARY*\nTotal Conducted Classes: ${attendanceSummary.totalConductedMax}\nPresent Sessions: ${attendanceSummary.totalPresent}\nAbsent Sessions: ${attendanceSummary.totalAbsent}\nLeave Records: ${attendanceSummary.totalLeave}\nOverall Attendance: ${attendanceSummary.overallRate}%`;
+      let totalPresent = 0;
+      let totalAbsent = 0;
+      let totalLeave = 0;
+      let totalConductedMax = 0;
+
+      filteredActiveStudents.forEach((st) => {
+        const att = dataService.calculateStudentAttendance(st.id, centerId, selectedMonth);
+        totalPresent += att.present;
+        totalAbsent += att.absent;
+        totalLeave += att.leave;
+        if (att.totalConducted > totalConductedMax) totalConductedMax = att.totalConducted;
+      });
+
+      const totalRecords = totalPresent + totalAbsent + totalLeave;
+      const overallRate = totalRecords > 0 ? Math.round((totalPresent / totalRecords) * 100) : 0;
+
+      return `*CRE – MONTHLY ATTENDANCE STATEMENT*\n*Wisdom Islamic Students Organization*\n\n*Centre:* ${centerName}\n*Month:* ${selectedMonth}\n\n*ATTENDANCE SUMMARY*\nTotal Conducted Classes: ${totalConductedMax}\nPresent Sessions: ${totalPresent}\nAbsent Sessions: ${totalAbsent}\nLeave Records: ${totalLeave}\nOverall Attendance: ${overallRate}%`;
     }
 
     if (reportType === 'financial') {
@@ -280,18 +315,22 @@ function CenterReportsContent() {
     }
 
     // Exam Report
-    return `*CRE – EXAMINATION REPORT*\n*Wisdom Islamic Students Organization*\n\n*Centre:* ${centerName}\n*Total Exams Recorded:* ${exams.length}\n*Evaluated Marks:* ${examMarks.length}`;
+    return `*CRE – EXAMINATION REPORT*\n*Wisdom Islamic Students Organization*\n\n*Centre:* ${centerName}\n*Total Exams Recorded:* ${exams.length}\n*Evaluated Marks (Filtered):* ${filteredExamMarks.length}`;
   }, [
     reportType,
     centerName,
     selectedDate,
-    classAttendanceData,
+    filteredClassRecords,
+    filteredPresentList,
+    filteredAbsentList,
+    filteredLeaveList,
     selectedMonth,
-    monthlyFees,
+    filteredMonthlyFees,
     financialSummary,
-    attendanceSummary,
+    filteredActiveStudents,
+    centerId,
     exams,
-    examMarks,
+    filteredExamMarks,
     showAdmNo,
     showName,
     showGender,
@@ -326,7 +365,7 @@ function CenterReportsContent() {
       let counter = 1;
       const rows: (string | number)[][] = [];
 
-      classAttendanceData.absentList.forEach((item) => {
+      filteredAbsentList.forEach((item) => {
         const row: (string | number)[] = [counter++];
         if (showAdmNo) row.push(item.student?.admissionNumber || '—');
         if (showName) row.push(item.student?.name || 'Student');
@@ -337,7 +376,7 @@ function CenterReportsContent() {
         rows.push(row);
       });
 
-      classAttendanceData.presentList.forEach((item) => {
+      filteredPresentList.forEach((item) => {
         const row: (string | number)[] = [counter++];
         if (showAdmNo) row.push(item.student?.admissionNumber || '—');
         if (showName) row.push(item.student?.name || 'Student');
@@ -348,7 +387,7 @@ function CenterReportsContent() {
         rows.push(row);
       });
 
-      classAttendanceData.leaveList.forEach((item) => {
+      filteredLeaveList.forEach((item) => {
         const row: (string | number)[] = [counter++];
         if (showAdmNo) row.push(item.student?.admissionNumber || '—');
         if (showName) row.push(item.student?.name || 'Student');
@@ -359,19 +398,22 @@ function CenterReportsContent() {
         rows.push(row);
       });
 
+      const total = filteredClassRecords.length;
+      const turnoutRate = total > 0 ? Math.round((filteredPresentList.length / total) * 100) : 0;
+
       generatePdfReport({
-        title: `Class Attendance Report (${selectedDate})`,
+        title: `Class Attendance Report (${formatDateDMY(selectedDate)})`,
         centerName,
-        period: selectedDate,
+        period: formatDateDMY(selectedDate),
         summaryItems: [
-          { label: 'Total Enrolled', value: classAttendanceData.total },
-          { label: 'Present', value: classAttendanceData.presentList.length },
-          { label: 'Absent', value: classAttendanceData.absentList.length },
-          { label: 'Turnout Rate', value: `${classAttendanceData.turnoutRate}%` },
+          { label: 'Total Filtered', value: total },
+          { label: 'Present', value: filteredPresentList.length },
+          { label: 'Absent', value: filteredAbsentList.length },
+          { label: 'Turnout Rate', value: `${turnoutRate}%` },
         ],
         columns,
         rows,
-        fileName: `${centerName}_class_attendance_${selectedDate}`,
+        fileName: `${centerName}_class_attendance_${formatDateDMY(selectedDate)}`,
       });
     } else if (reportType === 'fee') {
       const columns = ['#'];
@@ -387,7 +429,7 @@ function CenterReportsContent() {
       if (showStatus) columns.push('Fee Status');
 
       let counter = 1;
-      const rows = monthlyFees.map((f) => {
+      const rows = filteredMonthlyFees.map((f) => {
         const st = dataService.getStudentById(f.studentId);
         const row: (string | number)[] = [counter++];
         if (showAdmNo) row.push(st?.admissionNumber || '—');
@@ -408,8 +450,9 @@ function CenterReportsContent() {
         centerName,
         period: selectedMonth,
         summaryItems: [
-          { label: 'Total Students', value: monthlyFees.length },
-          { label: 'Collected Fee', value: formatCurrency(financialSummary.totalFeeIncome) },
+          { label: 'Total Filtered', value: filteredMonthlyFees.length },
+          { label: 'Collected Fee', value: formatCurrency(filteredMonthlyFees.reduce((a, b) => a + (b.paidAmount || 0), 0)) },
+          { label: 'Outstanding', value: formatCurrency(filteredMonthlyFees.reduce((a, b) => a + (b.outstandingAmount || 0), 0)) },
         ],
         columns,
         rows,
@@ -430,7 +473,7 @@ function CenterReportsContent() {
       if (showStatus) columns.push('Attendance %');
 
       let counter = 1;
-      const rows = activeStudents.map((s) => {
+      const rows = filteredActiveStudents.map((s) => {
         const att = dataService.calculateStudentAttendance(s.id, centerId, selectedMonth);
         const row: (string | number)[] = [counter++];
         if (showAdmNo) row.push(s.admissionNumber);
@@ -452,9 +495,8 @@ function CenterReportsContent() {
         centerName,
         period: selectedMonth,
         summaryItems: [
+          { label: 'Filtered Students', value: filteredActiveStudents.length },
           { label: 'Overall Rate', value: `${attendanceSummary.overallRate}%` },
-          { label: 'Present Turnout', value: attendanceSummary.totalPresent },
-          { label: 'Absent Turnout', value: attendanceSummary.totalAbsent },
         ],
         columns,
         rows,
@@ -498,7 +540,7 @@ function CenterReportsContent() {
       if (showStatus) columns.push('Result');
 
       let counter = 1;
-      const rows = examMarks.map((m) => {
+      const rows = filteredExamMarks.map((m) => {
         const st = dataService.getStudentById(m.studentId);
         const ex = dataService.getExamById(m.examId);
         const row: (string | number)[] = [counter++];
@@ -520,7 +562,7 @@ function CenterReportsContent() {
         period: 'All Records',
         summaryItems: [
           { label: 'Total Exams', value: exams.length },
-          { label: 'Records', value: examMarks.length },
+          { label: 'Filtered Records', value: filteredExamMarks.length },
         ],
         columns,
         rows,
@@ -654,7 +696,7 @@ function CenterReportsContent() {
                     <option value="">Recorded Dates ({availableDates.length})</option>
                     {availableDates.map((d) => (
                       <option key={d} value={d}>
-                        {d}
+                        {formatDateDMY(d)}
                       </option>
                     ))}
                   </select>
@@ -887,20 +929,22 @@ function CenterReportsContent() {
           <div className="space-y-6">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div className="bg-white p-4 rounded-2xl border border-cre-border shadow-xs">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Total Enrolled</span>
-                <span className="text-xl font-black text-cre-navy mt-1 block">{classAttendanceData.total}</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Total Filtered</span>
+                <span className="text-xl font-black text-cre-navy mt-1 block">{filteredClassRecords.length}</span>
               </div>
               <div className="bg-cre-green-light p-4 rounded-2xl border border-cre-green/30 shadow-xs">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-cre-green block">Present Students</span>
-                <span className="text-xl font-black text-cre-green mt-1 block">{classAttendanceData.presentList.length}</span>
+                <span className="text-xl font-black text-cre-green mt-1 block">{filteredPresentList.length}</span>
               </div>
               <div className="bg-red-50 p-4 rounded-2xl border border-red-200 shadow-xs">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-red-600 block">Absent Students</span>
-                <span className="text-xl font-black text-red-700 mt-1 block">{classAttendanceData.absentList.length}</span>
+                <span className="text-xl font-black text-red-700 mt-1 block">{filteredAbsentList.length}</span>
               </div>
               <div className="bg-white p-4 rounded-2xl border border-cre-border shadow-xs">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Turnout Rate</span>
-                <span className="text-xl font-black text-cre-navy mt-1 block">{classAttendanceData.turnoutRate}%</span>
+                <span className="text-xl font-black text-cre-navy mt-1 block">
+                  {filteredClassRecords.length > 0 ? Math.round((filteredPresentList.length / filteredClassRecords.length) * 100) : 0}%
+                </span>
               </div>
             </div>
 
@@ -908,10 +952,10 @@ function CenterReportsContent() {
             <div className="bg-white rounded-2xl border border-cre-border shadow-xs overflow-hidden">
               <div className="p-4 border-b border-cre-border flex items-center justify-between">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-cre-navy">
-                  Class Attendance Turnout – {selectedDate}
+                  Class Attendance Turnout – {formatDateDMY(selectedDate)}
                 </h3>
                 <span className="text-[11px] text-slate-500 font-medium">
-                  {classAttendanceData.records.length} Students Processed
+                  {filteredClassRecords.length} Students Filtered
                 </span>
               </div>
 
@@ -1096,24 +1140,24 @@ function CenterReportsContent() {
               <div className="bg-white p-4 rounded-2xl border border-cre-border shadow-xs">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Total Expected</span>
                 <span className="text-xl font-black text-cre-navy mt-1 block">
-                  {formatCurrency(monthlyFees.reduce((acc, f) => acc + (f.expectedFee || 0), 0))}
+                  {formatCurrency(filteredMonthlyFees.reduce((acc, f) => acc + (f.expectedFee || 0), 0))}
                 </span>
               </div>
               <div className="bg-cre-green-light p-4 rounded-2xl border border-cre-green/30 shadow-xs">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-cre-green block">Collected Fee</span>
                 <span className="text-xl font-black text-cre-green mt-1 block">
-                  {formatCurrency(monthlyFees.reduce((acc, f) => acc + (f.paidAmount || 0), 0))}
+                  {formatCurrency(filteredMonthlyFees.reduce((acc, f) => acc + (f.paidAmount || 0), 0))}
                 </span>
               </div>
               <div className="bg-amber-50 p-4 rounded-2xl border border-amber-200 shadow-xs">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 block">Outstanding</span>
                 <span className="text-xl font-black text-amber-800 mt-1 block">
-                  {formatCurrency(monthlyFees.reduce((acc, f) => acc + (f.outstandingAmount || 0), 0))}
+                  {formatCurrency(filteredMonthlyFees.reduce((acc, f) => acc + (f.outstandingAmount || 0), 0))}
                 </span>
               </div>
               <div className="bg-white p-4 rounded-2xl border border-cre-border shadow-xs">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Total Students</span>
-                <span className="text-xl font-black text-cre-navy mt-1 block">{monthlyFees.length}</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Filtered Students</span>
+                <span className="text-xl font-black text-cre-navy mt-1 block">{filteredMonthlyFees.length}</span>
               </div>
             </div>
 

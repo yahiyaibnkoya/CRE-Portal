@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { dataService } from '@/lib/dataService';
 import { Donation } from '@/types';
 import { formatCurrency } from '@/lib/constants';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import {
   HeartHandshake,
   Plus,
@@ -16,16 +17,23 @@ import {
   CheckCircle,
   X,
   IndianRupee,
+  Edit2,
+  Trash2,
 } from 'lucide-react';
 
 export default function SuperAdminDonationsPage() {
   const { adminUser, refreshData } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [centerFilter, setCenterFilter] = useState('ALL');
+  const [filterMode, setFilterMode] = useState<'month' | 'date'>('month');
   const [selectedMonth, setSelectedMonth] = useState('');
+  const [selectedDate, setSelectedDate] = useState('');
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingDonation, setEditingDonation] = useState<Donation | null>(null);
+  const [deleteDonationId, setDeleteDonationId] = useState<string | null>(null);
+
   const [donorName, setDonorName] = useState('');
   const [amount, setAmount] = useState<number | ''>('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -37,7 +45,8 @@ export default function SuperAdminDonationsPage() {
 
   const filteredDonations = allDonations.filter((d) => {
     if (centerFilter !== 'ALL' && d.centerId !== centerFilter) return false;
-    if (selectedMonth && !d.date.startsWith(selectedMonth)) return false;
+    if (filterMode === 'month' && selectedMonth && !d.date.startsWith(selectedMonth)) return false;
+    if (filterMode === 'date' && selectedDate && d.date !== selectedDate) return false;
     if (searchTerm) {
       const q = searchTerm.toLowerCase();
       const matchDonor = (d.donorName || '').toLowerCase().includes(q);
@@ -50,6 +59,7 @@ export default function SuperAdminDonationsPage() {
   const totalDonationAmount = filteredDonations.reduce((acc, d) => acc + (d.amount || 0), 0);
 
   const handleOpenAdd = () => {
+    setEditingDonation(null);
     setDonorName('');
     setAmount('');
     setDate(new Date().toISOString().split('T')[0]);
@@ -58,21 +68,49 @@ export default function SuperAdminDonationsPage() {
     setIsModalOpen(true);
   };
 
+  const handleOpenEdit = (d: Donation) => {
+    setEditingDonation(d);
+    setDonorName(d.donorName || '');
+    setAmount(d.amount);
+    setDate(d.date);
+    setTargetCenterId(d.centerId);
+    setRemarks(d.remarks || '');
+    setIsModalOpen(true);
+  };
+
   const handleSaveDonation = (e: React.FormEvent) => {
     e.preventDefault();
     if (!amount || Number(amount) <= 0 || !targetCenterId) return;
 
-    dataService.addDonation({
-      centerId: targetCenterId,
-      donorName: donorName || 'Well-wisher (Anonymous)',
-      amount: Number(amount),
-      date,
-      remarks,
-      recordedBy: adminUser?.name || 'Super Admin',
-    });
+    if (editingDonation) {
+      dataService.updateDonation(editingDonation.id, {
+        centerId: targetCenterId,
+        donorName: donorName || 'Well-wisher (Anonymous)',
+        amount: Number(amount),
+        date,
+        remarks,
+      });
+    } else {
+      dataService.addDonation({
+        centerId: targetCenterId,
+        donorName: donorName || 'Well-wisher (Anonymous)',
+        amount: Number(amount),
+        date,
+        remarks,
+        recordedBy: adminUser?.name || 'Super Admin',
+      });
+    }
 
     setIsModalOpen(false);
     refreshData();
+  };
+
+  const handleConfirmDelete = () => {
+    if (deleteDonationId) {
+      dataService.deleteDonation(deleteDonationId);
+      setDeleteDonationId(null);
+      refreshData();
+    }
   };
 
   return (
@@ -147,14 +185,41 @@ export default function SuperAdminDonationsPage() {
           </div>
 
           <div className="flex items-center space-x-2 bg-white px-3 py-2 rounded-xl border border-cre-border text-xs">
-            <Calendar className="w-4 h-4 text-slate-400" />
-            <input
-              type="month"
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              placeholder="All Months"
-              className="bg-transparent text-slate-800 font-semibold focus:outline-hidden cursor-pointer w-full"
-            />
+            <div className="flex items-center bg-slate-100 rounded-lg p-0.5 mr-1 shrink-0">
+              <button
+                type="button"
+                onClick={() => setFilterMode('month')}
+                className={`px-2 py-1 text-[10px] font-bold rounded-md transition-all ${
+                  filterMode === 'month' ? 'bg-cre-navy text-white' : 'text-slate-600'
+                }`}
+              >
+                By Month
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterMode('date')}
+                className={`px-2 py-1 text-[10px] font-bold rounded-md transition-all ${
+                  filterMode === 'date' ? 'bg-cre-navy text-white' : 'text-slate-600'
+                }`}
+              >
+                By Date
+              </button>
+            </div>
+            {filterMode === 'month' ? (
+              <input
+                type="month"
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="bg-transparent text-slate-800 font-semibold focus:outline-hidden cursor-pointer w-full"
+              />
+            ) : (
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="bg-transparent text-slate-800 font-semibold focus:outline-hidden cursor-pointer w-full"
+              />
+            )}
           </div>
         </div>
 
@@ -164,19 +229,22 @@ export default function SuperAdminDonationsPage() {
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 border-b border-cre-border text-[11px] font-bold text-cre-navy uppercase tracking-wider">
                 <tr>
+                  <th className="py-3.5 px-4">#</th>
                   <th className="py-3.5 px-4">Date</th>
                   <th className="py-3.5 px-4">Donor Name</th>
                   <th className="py-3.5 px-4">Centre</th>
                   <th className="py-3.5 px-4">Amount</th>
                   <th className="py-3.5 px-4">Remarks</th>
                   <th className="py-3.5 px-4">Recorded By</th>
+                  <th className="py-3.5 px-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-cre-border">
-                {filteredDonations.map((d) => {
+                {filteredDonations.map((d, idx) => {
                   const center = dataService.getCenterById(d.centerId);
                   return (
                     <tr key={d.id} className="hover:bg-slate-50/70 transition-colors">
+                      <td className="py-3.5 px-4 font-bold text-slate-400">{idx + 1}</td>
                       <td className="py-3.5 px-4 font-mono text-slate-600">{d.date}</td>
                       <td className="py-3.5 px-4 font-bold text-slate-900">{d.donorName || 'Well-wisher'}</td>
                       <td className="py-3.5 px-4 text-slate-600">
@@ -193,13 +261,33 @@ export default function SuperAdminDonationsPage() {
                       <td className="py-3.5 px-4 text-[10px] text-slate-400">
                         {d.recordedBy}
                       </td>
+                      <td className="py-3.5 px-4 text-right">
+                        <div className="inline-flex items-center space-x-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(d)}
+                            className="p-1.5 text-slate-500 hover:text-cre-navy hover:bg-slate-100 rounded-lg transition-colors"
+                            title="Edit Donation"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeleteDonationId(d.id)}
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Delete Donation"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   );
                 })}
 
                 {filteredDonations.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="py-8 text-center text-xs text-slate-400">
+                    <td colSpan={8} className="py-8 text-center text-xs text-slate-400">
                       No donation entries found.
                     </td>
                   </tr>
@@ -209,7 +297,7 @@ export default function SuperAdminDonationsPage() {
           </div>
         </div>
 
-        {/* ADD DONATION MODAL */}
+        {/* ADD / EDIT DONATION MODAL */}
         {isModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
             <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-cre-border">
@@ -218,7 +306,9 @@ export default function SuperAdminDonationsPage() {
                   <div className="p-2 rounded-xl bg-cre-green-light text-cre-green">
                     <HeartHandshake className="w-5 h-5" />
                   </div>
-                  <h3 className="text-sm font-bold text-cre-navy">Record Donation</h3>
+                  <h3 className="text-sm font-bold text-cre-navy">
+                    {editingDonation ? 'Edit Donation Record' : 'Record New Donation'}
+                  </h3>
                 </div>
                 <button
                   type="button"
@@ -316,13 +406,24 @@ export default function SuperAdminDonationsPage() {
                     type="submit"
                     className="px-5 py-2 text-xs font-bold text-white bg-cre-green hover:bg-cre-green-hover rounded-xl shadow-xs"
                   >
-                    Save Donation
+                    {editingDonation ? 'Update Donation' : 'Save Donation'}
                   </button>
                 </div>
               </form>
             </div>
           </div>
         )}
+
+        {/* CONFIRM DELETE MODAL */}
+        <ConfirmModal
+          isOpen={!!deleteDonationId}
+          title="Delete Donation Record"
+          message="Are you sure you want to delete this donation record? This will permanently deduct this contribution from centre accounts."
+          confirmText="Delete Donation"
+          isDanger={true}
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setDeleteDonationId(null)}
+        />
       </div>
     </AppShell>
   );

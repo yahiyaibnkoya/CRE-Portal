@@ -12,6 +12,7 @@ import {
   DonatedContact,
   Faculty,
   FacultyStatus,
+  ClassNotHeld,
   SystemSettings,
   AuditLog,
   AttendanceStatus,
@@ -38,6 +39,8 @@ import {
   deleteDoc,
   query,
   where,
+  onSnapshot,
+  Unsubscribe,
 } from 'firebase/firestore';
 
 // Initial default settings
@@ -67,6 +70,9 @@ function getDefaultSuperAdmin(): AdminUser {
 class DataService {
   private inited = false;
   private syncing = false;
+  private realtimeActive = false;
+  private listeners: Set<() => void> = new Set();
+  private unsubs: Unsubscribe[] = [];
 
   // In-memory cache: Sole runtime store populated directly from Firestore
   // NEVER persisted to LocalStorage!
@@ -83,11 +89,29 @@ class DataService {
     examMarks: [] as ExamMark[],
     donatedContacts: [] as DonatedContact[],
     faculties: [] as Faculty[],
+    classNotHeld: [] as ClassNotHeld[],
     settings: DEFAULT_SETTINGS,
     auditLogs: [] as AuditLog[],
   };
 
-  private async syncDocToFirestore(collName: string, id: string, data: any) {
+  public subscribe(fn: () => void): () => void {
+    this.listeners.add(fn);
+    return () => {
+      this.listeners.delete(fn);
+    };
+  }
+
+  public notifyListeners(): void {
+    this.listeners.forEach((fn) => {
+      try {
+        fn();
+      } catch (err) {
+        console.error('DataService listener error:', err);
+      }
+    });
+  }
+
+  public async syncDocToFirestore(collName: string, id: string, data: any) {
     try {
       if (db && typeof window !== 'undefined') {
         await setDoc(doc(db, collName, id), JSON.parse(JSON.stringify(data)), { merge: true });
@@ -97,7 +121,7 @@ class DataService {
     }
   }
 
-  private async deleteDocFromFirestore(collName: string, id: string) {
+  public async deleteDocFromFirestore(collName: string, id: string) {
     try {
       if (db && typeof window !== 'undefined') {
         await deleteDoc(doc(db, collName, id));
@@ -126,8 +150,72 @@ class DataService {
       // LocalStorage access check
     }
 
-    // Trigger initial background sync with Cloud Firestore
+    // Start background sync & realtime listeners
     this.syncWithFirestore();
+    this.startRealtimeSync();
+  }
+
+  private startRealtimeSync() {
+    const firestoreDb = db;
+    if (!firestoreDb || typeof window === 'undefined' || this.realtimeActive) return;
+    this.realtimeActive = true;
+
+    const collectionsToListen: Array<keyof typeof this.cache> = [
+      'users',
+      'centers',
+      'students',
+      'attendance',
+      'monthlyFees',
+      'feePayments',
+      'donations',
+      'expenses',
+      'exams',
+      'examMarks',
+      'donatedContacts',
+      'faculties',
+      'classNotHeld',
+      'auditLogs',
+    ];
+
+    collectionsToListen.forEach((collName) => {
+      try {
+        const unsub = onSnapshot(
+          collection(firestoreDb, collName),
+          (snap) => {
+            const items: any[] = [];
+            snap.forEach((d) => items.push(d.data()));
+
+            if (collName === 'users') {
+              if (items.length > 0) {
+                this.cache.users = items as AdminUser[];
+              }
+            } else {
+              (this.cache as any)[collName] = items;
+            }
+            this.notifyListeners();
+          },
+          (err) => {
+            console.warn(`Realtime listener error for ${collName}:`, err);
+          }
+        );
+        this.unsubs.push(unsub);
+      } catch (e) {
+        console.warn(`Could not attach realtime listener for ${collName}:`, e);
+      }
+    });
+
+    // Realtime listener for settings
+    try {
+      const unsubSet = onSnapshot(collection(firestoreDb, 'settings'), (snap) => {
+        if (!snap.empty) {
+          this.cache.settings = { ...DEFAULT_SETTINGS, ...snap.docs[0].data() };
+          this.notifyListeners();
+        }
+      });
+      this.unsubs.push(unsubSet);
+    } catch {
+      // Non-critical
+    }
   }
 
   public async ensureSynced(): Promise<void> {
@@ -153,6 +241,7 @@ class DataService {
         'examMarks',
         'donatedContacts',
         'faculties',
+        'classNotHeld',
         'auditLogs',
       ];
 
@@ -187,6 +276,7 @@ class DataService {
       } catch {
         // Non-critical
       }
+      this.notifyListeners();
     } catch (err) {
       console.warn('Firestore sync error:', err);
     } finally {
@@ -445,6 +535,7 @@ class DataService {
     this.init();
     const now = new Date().toISOString();
     let saved: Faculty;
+    const phoneNorm = facultyData.phone ? normalizePhoneNumber(facultyData.phone) : '';
 
     if (facultyData.id) {
       const idx = this.cache.faculties.findIndex((f) => f.id === facultyData.id);
@@ -452,7 +543,7 @@ class DataService {
         saved = {
           ...this.cache.faculties[idx],
           ...facultyData,
-          phone: normalizePhoneNumber(facultyData.phone || this.cache.faculties[idx].phone),
+          phone: phoneNorm || this.cache.faculties[idx].phone || '',
           updatedAt: now,
         } as Faculty;
         this.cache.faculties[idx] = saved;
@@ -460,7 +551,7 @@ class DataService {
         saved = {
           id: facultyData.id,
           name: facultyData.name || 'Faculty Member',
-          phone: normalizePhoneNumber(facultyData.phone || ''),
+          phone: phoneNorm,
           place: facultyData.place || '',
           qualification: facultyData.qualification || '',
           status: facultyData.status || 'Approved',
@@ -476,7 +567,7 @@ class DataService {
       saved = {
         id,
         name: facultyData.name || 'Faculty Member',
-        phone: normalizePhoneNumber(facultyData.phone || ''),
+        phone: phoneNorm,
         place: facultyData.place || '',
         qualification: facultyData.qualification || '',
         status: facultyData.status || 'Approved',
@@ -488,8 +579,9 @@ class DataService {
       this.cache.faculties.push(saved);
     }
 
+    this.notifyListeners();
     this.syncDocToFirestore('faculties', saved.id, saved);
-    this.logAudit('Faculty Saved', `Faculty ${saved.name} (${saved.phone}) saved by ${performedBy}`, performedBy);
+    this.logAudit('Faculty Saved', `Faculty ${saved.name} (${saved.phone || 'No phone'}) saved by ${performedBy}`, performedBy);
     return saved;
   }
 
@@ -589,6 +681,7 @@ class DataService {
       this.cache.centers.push(target);
     }
 
+    this.notifyListeners();
     this.syncDocToFirestore('centers', target.id, target);
     this.logAudit('Center Saved', `Center ${target.name} (${target.place}) updated/created`, 'Admin', target.id);
     return target;
@@ -601,11 +694,13 @@ class DataService {
 
     if (permanent) {
       this.cache.centers = this.cache.centers.filter((c) => c.id !== centerId);
+      this.notifyListeners();
       this.deleteDocFromFirestore('centers', centerId);
       this.logAudit('Center Deleted', `Center ${center.name} permanently deleted`, 'Super Admin');
     } else {
       center.status = 'Archived';
       center.updatedAt = new Date().toISOString();
+      this.notifyListeners();
       this.syncDocToFirestore('centers', center.id, center);
       this.logAudit('Center Archived', `Center ${center.name} archived`, 'Super Admin', centerId);
     }
@@ -618,6 +713,7 @@ class DataService {
     if (!center) return false;
     center.status = status;
     center.updatedAt = new Date().toISOString();
+    this.notifyListeners();
     this.syncDocToFirestore('centers', center.id, center);
     this.logAudit('Center Status Changed', `Center ${center.name} status updated to ${status}`, 'Super Admin', centerId);
     return true;
@@ -782,6 +878,7 @@ class DataService {
       this.cache.students.push(student);
     }
 
+    this.notifyListeners();
     this.syncDocToFirestore('students', student.id, student);
     this.logAudit('Student Saved', `Student ${student.name} (${student.admissionNumber}) saved by ${performedBy}`, performedBy, student.centerId);
     return student;
@@ -793,6 +890,7 @@ class DataService {
     if (!s) return false;
     s.status = status;
     s.updatedAt = new Date().toISOString();
+    this.notifyListeners();
     this.syncDocToFirestore('students', s.id, s);
     this.logAudit('Student Status Changed', `Student ${s.name} status updated to ${status} by ${performedBy}`, performedBy, s.centerId);
     return true;
@@ -803,6 +901,7 @@ class DataService {
     const s = this.cache.students.find((item) => item.id === studentId);
     if (!s) return false;
     this.cache.students = this.cache.students.filter((item) => item.id !== studentId);
+    this.notifyListeners();
     this.deleteDocFromFirestore('students', studentId);
     this.logAudit(
       'Student Deleted',
@@ -842,8 +941,68 @@ class DataService {
     }));
 
     this.cache.attendance.push(...newRecords);
+    this.notifyListeners();
     newRecords.forEach((nr) => this.syncDocToFirestore('attendance', nr.id, nr));
     this.logAudit('Attendance Recorded', `Attendance for ${date} (${newRecords.length} students) saved`, recordedBy, centerId);
+  }
+
+  // CLASS NOT HELD
+  public saveClassNotHeld(params: {
+    centerId: string;
+    date: string;
+    reason: string;
+    remarks?: string;
+    recordedBy: string;
+  }): ClassNotHeld {
+    this.init();
+    const id = `cnh-${params.centerId}-${params.date}`;
+    const record: ClassNotHeld = {
+      id,
+      centerId: params.centerId,
+      date: params.date,
+      reason: params.reason,
+      remarks: params.remarks,
+      recordedBy: params.recordedBy,
+      createdAt: new Date().toISOString(),
+    };
+    const idx = this.cache.classNotHeld.findIndex((c) => c.id === id);
+    if (idx >= 0) {
+      this.cache.classNotHeld[idx] = record;
+    } else {
+      this.cache.classNotHeld.push(record);
+    }
+    this.notifyListeners();
+    this.syncDocToFirestore('classNotHeld', id, record);
+    this.logAudit('Class Not Held Marked', `Class on ${params.date} marked as Not Held (${params.reason}) by ${params.recordedBy}`, params.recordedBy, params.centerId);
+    return record;
+  }
+
+  public deleteClassNotHeld(id: string, recordedBy: string = 'Admin'): boolean {
+    this.init();
+    const existing = this.cache.classNotHeld.find((c) => c.id === id);
+    if (!existing) return false;
+    this.cache.classNotHeld = this.cache.classNotHeld.filter((c) => c.id !== id);
+    this.notifyListeners();
+    this.deleteDocFromFirestore('classNotHeld', id);
+    this.logAudit('Class Not Held Reverted', `Class Not Held reverted for ${existing.date} by ${recordedBy}`, recordedBy, existing.centerId);
+    return true;
+  }
+
+  public getClassNotHeld(centerId?: string, date?: string): ClassNotHeld[] {
+    this.init();
+    let list = this.cache.classNotHeld;
+    if (centerId && centerId !== 'ALL') {
+      list = list.filter((c) => c.centerId === centerId);
+    }
+    if (date) {
+      list = list.filter((c) => c.date === date);
+    }
+    return list;
+  }
+
+  public isClassNotHeld(centerId: string, date: string): ClassNotHeld | undefined {
+    this.init();
+    return this.cache.classNotHeld.find((c) => c.centerId === centerId && c.date === date);
   }
 
   public calculateStudentAttendance(studentId: string, centerId: string, month?: string): { totalConducted: number; present: number; absent: number; leave: number; percentage: number; records: AttendanceRecord[] } {
@@ -855,12 +1014,16 @@ class DataService {
     const centerAtt = this.cache.attendance.filter((a) => a.centerId === centerId);
     const monthAtt = month ? centerAtt.filter((a) => a.date.startsWith(month)) : centerAtt;
     const uniqueDates = Array.from(new Set(monthAtt.map((a) => a.date)));
-    const totalConducted = uniqueDates.length;
-    const present = records.filter((r) => r.status === 'Present').length;
-    const absent = records.filter((r) => r.status === 'Absent').length;
-    const leave = records.filter((r) => r.status === 'Leave').length;
+    // Filter out dates where class was marked as not held
+    const validConductedDates = uniqueDates.filter((d) => !this.isClassNotHeld(centerId, d));
+    const totalConducted = validConductedDates.length;
+    // Also ignore attendance records on dates where class was not held
+    const validRecords = records.filter((r) => !this.isClassNotHeld(centerId, r.date));
+    const present = validRecords.filter((r) => r.status === 'Present').length;
+    const absent = validRecords.filter((r) => r.status === 'Absent').length;
+    const leave = validRecords.filter((r) => r.status === 'Leave').length;
     const percentage = totalConducted > 0 ? Math.round((present / totalConducted) * 100) : 100;
-    return { totalConducted, present, absent, leave, percentage, records };
+    return { totalConducted, present, absent, leave, percentage, records: validRecords };
   }
 
   // FEES
@@ -999,10 +1162,116 @@ class DataService {
     } else {
       this.cache.monthlyFees.push(feeRecord);
     }
+    this.notifyListeners();
     this.syncDocToFirestore('monthlyFees', feeRecord.id, feeRecord);
 
     this.logAudit('Fee Payment Recorded', `Payment of ₹${params.amount} for ${student?.name || params.studentId} (${params.month})`, params.recordedBy, params.centerId);
     return payment;
+  }
+
+  public updateFeePayment(
+    paymentId: string,
+    updates: { amount: number; paymentDate: string; remarks?: string },
+    recordedBy: string = 'Admin'
+  ): FeePayment | null {
+    this.init();
+    const idx = this.cache.feePayments.findIndex((p) => p.id === paymentId);
+    if (idx < 0) return null;
+    const old = this.cache.feePayments[idx];
+    const updated: FeePayment = {
+      ...old,
+      amount: updates.amount,
+      paymentDate: updates.paymentDate,
+      remarks: updates.remarks !== undefined ? updates.remarks : old.remarks,
+    };
+    this.cache.feePayments[idx] = updated;
+    this.syncDocToFirestore('feePayments', paymentId, updated);
+    this.recalculateMonthlyFee(updated.centerId, updated.studentId, updated.month);
+    this.notifyListeners();
+    this.logAudit('Fee Payment Updated', `Payment ${paymentId} updated to ₹${updates.amount}`, recordedBy, updated.centerId);
+    return updated;
+  }
+
+  public deleteFeePayment(paymentId: string, recordedBy: string = 'Admin'): boolean {
+    this.init();
+    const p = this.cache.feePayments.find((item) => item.id === paymentId);
+    if (!p) return false;
+    this.cache.feePayments = this.cache.feePayments.filter((item) => item.id !== paymentId);
+    this.deleteDocFromFirestore('feePayments', paymentId);
+    this.recalculateMonthlyFee(p.centerId, p.studentId, p.month);
+    this.notifyListeners();
+    this.logAudit('Fee Payment Deleted', `Fee payment of ₹${p.amount} deleted for student ${p.studentId}`, recordedBy, p.centerId);
+    return true;
+  }
+
+  public resetStudentFeeToUnpaid(centerId: string, studentId: string, month: string, recordedBy: string = 'Admin'): boolean {
+    this.init();
+    const toDelete = this.cache.feePayments.filter(
+      (p) => p.centerId === centerId && p.studentId === studentId && p.month === month
+    );
+    toDelete.forEach((p) => {
+      this.deleteDocFromFirestore('feePayments', p.id);
+    });
+    this.cache.feePayments = this.cache.feePayments.filter(
+      (p) => !(p.centerId === centerId && p.studentId === studentId && p.month === month)
+    );
+    this.recalculateMonthlyFee(centerId, studentId, month);
+    this.notifyListeners();
+    this.logAudit('Fee Reset to Unpaid', `Fee status reset to Unpaid for student ${studentId} in ${month}`, recordedBy, centerId);
+    return true;
+  }
+
+  private recalculateMonthlyFee(centerId: string, studentId: string, month: string) {
+    const student = this.getStudentById(studentId);
+    const existingFeeRecord = this.cache.monthlyFees.find(
+      (f) => f.centerId === centerId && f.studentId === studentId && f.month === month
+    );
+    const expected = existingFeeRecord ? existingFeeRecord.expectedFee : (student ? student.defaultFee : 100);
+    const payments = this.cache.feePayments.filter(
+      (p) => p.centerId === centerId && p.studentId === studentId && p.month === month
+    );
+    const paidAmount = payments.reduce((acc, p) => acc + p.amount, 0);
+
+    let status: FeeStatus = 'Unpaid';
+    let outstandingAmount = expected;
+    let advanceCredit = 0;
+
+    if (paidAmount === 0) {
+      status = 'Unpaid';
+      outstandingAmount = expected;
+    } else if (paidAmount < expected) {
+      status = 'Partially Paid';
+      outstandingAmount = expected - paidAmount;
+    } else if (paidAmount === expected) {
+      status = 'Paid';
+      outstandingAmount = 0;
+    } else {
+      status = 'Advance / Excess';
+      outstandingAmount = 0;
+      advanceCredit = paidAmount - expected;
+    }
+
+    const feeRecordId = `fee-${centerId}-${month}-${studentId}`;
+    const feeRecord: MonthlyFeeRecord = {
+      id: feeRecordId,
+      centerId,
+      studentId,
+      month,
+      expectedFee: expected,
+      paidAmount,
+      outstandingAmount,
+      advanceCredit,
+      status,
+      lastPaymentDate: payments.length > 0 ? payments[payments.length - 1].paymentDate : undefined,
+    };
+
+    const idx = this.cache.monthlyFees.findIndex((f) => f.id === feeRecordId);
+    if (idx >= 0) {
+      this.cache.monthlyFees[idx] = feeRecord;
+    } else {
+      this.cache.monthlyFees.push(feeRecord);
+    }
+    this.syncDocToFirestore('monthlyFees', feeRecordId, feeRecord);
   }
 
   public updateStudentMonthlyFee(params: {
@@ -1058,6 +1327,7 @@ class DataService {
       this.cache.monthlyFees.push(feeRecord);
     }
 
+    this.notifyListeners();
     this.syncDocToFirestore('monthlyFees', feeRecordId, feeRecord);
     this.logAudit('Fee Adjusted', `Monthly expected fee adjusted to ₹${expected} for ${params.studentId}`, 'Admin', params.centerId);
     return feeRecord;
@@ -1084,6 +1354,7 @@ class DataService {
       createdAt: new Date().toISOString(),
     };
     this.cache.donations.push(donation);
+    this.notifyListeners();
     this.syncDocToFirestore('donations', donation.id, donation);
     this.logAudit('Donation Recorded', `Donation of ₹${donation.amount} received from ${donation.donorName || 'Well-wisher'}`, donation.recordedBy, donation.centerId);
     return donation;
@@ -1091,6 +1362,32 @@ class DataService {
 
   public addDonation(donationData: Omit<Donation, 'id' | 'createdAt'>): Donation {
     return this.saveDonation(donationData);
+  }
+
+  public updateDonation(id: string, updates: Partial<Donation>, recordedBy: string = 'Admin'): Donation | null {
+    this.init();
+    const idx = this.cache.donations.findIndex((d) => d.id === id);
+    if (idx < 0) return null;
+    const updated: Donation = {
+      ...this.cache.donations[idx],
+      ...updates,
+    };
+    this.cache.donations[idx] = updated;
+    this.notifyListeners();
+    this.syncDocToFirestore('donations', id, updated);
+    this.logAudit('Donation Updated', `Donation ${id} updated to ₹${updated.amount} from ${updated.donorName || 'Well-wisher'}`, recordedBy, updated.centerId);
+    return updated;
+  }
+
+  public deleteDonation(id: string, recordedBy: string = 'Admin'): boolean {
+    this.init();
+    const existing = this.cache.donations.find((d) => d.id === id);
+    if (!existing) return false;
+    this.cache.donations = this.cache.donations.filter((d) => d.id !== id);
+    this.notifyListeners();
+    this.deleteDocFromFirestore('donations', id);
+    this.logAudit('Donation Deleted', `Donation of ₹${existing.amount} deleted`, recordedBy, existing.centerId);
+    return true;
   }
 
   public getExpenses(centerId?: string, month?: string): Expense[] {
@@ -1113,6 +1410,7 @@ class DataService {
       createdAt: new Date().toISOString(),
     };
     this.cache.expenses.push(expense);
+    this.notifyListeners();
     this.syncDocToFirestore('expenses', expense.id, expense);
     this.logAudit('Expense Recorded', `Expense ₹${expense.amount} under category ${expense.category}`, expense.recordedBy, expense.centerId);
     return expense;
@@ -1122,11 +1420,27 @@ class DataService {
     return this.saveExpense(expenseData);
   }
 
+  public updateExpense(id: string, updates: Partial<Expense>, recordedBy: string = 'Admin'): Expense | null {
+    this.init();
+    const idx = this.cache.expenses.findIndex((e) => e.id === id);
+    if (idx < 0) return null;
+    const updated: Expense = {
+      ...this.cache.expenses[idx],
+      ...updates,
+    };
+    this.cache.expenses[idx] = updated;
+    this.notifyListeners();
+    this.syncDocToFirestore('expenses', id, updated);
+    this.logAudit('Expense Updated', `Expense ${id} updated to ₹${updated.amount} (${updated.category})`, recordedBy, updated.centerId);
+    return updated;
+  }
+
   public deleteExpense(expenseId: string, recordedBy: string = 'Admin'): boolean {
     this.init();
     const exp = this.cache.expenses.find((e) => e.id === expenseId);
     if (!exp) return false;
     this.cache.expenses = this.cache.expenses.filter((e) => e.id !== expenseId);
+    this.notifyListeners();
     this.deleteDocFromFirestore('expenses', expenseId);
     this.logAudit('Expense Deleted', `Expense of ₹${exp.amount} deleted`, recordedBy, exp.centerId);
     return true;

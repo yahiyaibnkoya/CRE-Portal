@@ -107,7 +107,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileMenu, isMobileMenu
 
           {/* Center: Active Centre Selector (For multi-centre admins) */}
           <div className="flex items-center space-x-2">
-            {role && role !== 'STUDENT' && availableCenters.length > 1 && (
+            {role === 'CENTER_ADMIN' && availableCenters.length > 1 && (
               <div className="flex items-center bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 text-xs">
                 <Building className="w-3.5 h-3.5 text-cre-green mr-1.5 shrink-0" />
                 <span className="text-slate-500 mr-1.5 hidden sm:inline text-[11px] font-medium">Centre:</span>
@@ -125,7 +125,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileMenu, isMobileMenu
               </div>
             )}
 
-            {role && availableCenters.length === 1 && activeCenter && (
+            {role === 'CENTER_ADMIN' && availableCenters.length === 1 && activeCenter && (
               <div className="hidden sm:flex items-center space-x-1.5 px-3 py-1 rounded-xl bg-slate-50 border border-slate-200 text-xs">
                 <Building className="w-3.5 h-3.5 text-cre-green shrink-0" />
                 <span className="font-bold text-cre-navy truncate max-w-[180px]">

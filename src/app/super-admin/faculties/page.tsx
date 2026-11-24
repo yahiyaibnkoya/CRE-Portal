@@ -79,7 +79,7 @@ export default function SuperAdminFacultiesPage() {
   const handleOpenEdit = (faculty: Faculty) => {
     setEditingFaculty(faculty);
     setName(faculty.name);
-    setPhone(faculty.phone);
+    setPhone(faculty.phone || '');
     setPlace(faculty.place || '');
     setQualification(faculty.qualification || '');
     setStatus(faculty.status);
@@ -94,10 +94,6 @@ export default function SuperAdminFacultiesPage() {
     setFormError(null);
     if (!name.trim()) {
       setFormError('Please enter faculty name.');
-      return;
-    }
-    if (!phone.trim()) {
-      setFormError('Please enter mobile phone number.');
       return;
     }
 
@@ -419,11 +415,10 @@ export default function SuperAdminFacultiesPage() {
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Contact Phone *
+                      Contact Phone (Optional)
                     </label>
                     <input
                       type="tel"
-                      required
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                       placeholder="e.g. 9876543210"

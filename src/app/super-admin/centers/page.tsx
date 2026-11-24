@@ -25,7 +25,10 @@ import {
   AlertTriangle,
   X,
   GraduationCap,
+  ShieldCheck,
+  MessageSquare,
 } from 'lucide-react';
+import { normalizePhoneNumber, getDefaultPassword } from '@/lib/constants';
 
 export default function SuperAdminCentersPage() {
   const { refreshData } = useAuth();
@@ -43,6 +46,10 @@ export default function SuperAdminCentersPage() {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCenter, setEditingCenter] = useState<Center | null>(null);
+
+  // Centre Admin Account Fields for Add/Edit
+  const [adminPhone, setAdminPhone] = useState('');
+  const [adminName, setAdminName] = useState('');
 
   // Delete Confirmation Modal
   const [deletingCenter, setDeletingCenter] = useState<Center | null>(null);
@@ -130,6 +137,8 @@ export default function SuperAdminCentersPage() {
     setDefaultFee(100);
     setExamMode('semester');
     setStatus('Active');
+    setAdminPhone('');
+    setAdminName('');
     setIsModalOpen(true);
   };
 
@@ -154,14 +163,33 @@ export default function SuperAdminCentersPage() {
     setDefaultFee(center.defaultFee);
     setExamMode(center.examMode);
     setStatus(center.status);
+
+    const firstAdminPhone = center.adminPhones && center.adminPhones.length > 0 ? center.adminPhones[0] : '';
+    setAdminPhone(firstAdminPhone);
+    const existingAdmin = firstAdminPhone ? dataService.getUserByPhone(firstAdminPhone) : null;
+    setAdminName(existingAdmin?.name || '');
+
     setIsModalOpen(true);
   };
 
   const handleSaveCenter = (e: React.FormEvent) => {
     e.preventDefault();
     const cleanContacts = contactNumbers.filter((n) => n.trim().length > 0).slice(0, 3);
+    const normAdminPhone = adminPhone.trim() ? normalizePhoneNumber(adminPhone.trim()) : '';
 
-    dataService.saveCenter({
+    let finalContacts = [...cleanContacts];
+    let adminPhones = editingCenter?.adminPhones ? [...editingCenter.adminPhones] : [];
+
+    if (normAdminPhone) {
+      if (!adminPhones.includes(normAdminPhone)) {
+        adminPhones = [normAdminPhone, ...adminPhones];
+      }
+      if (!finalContacts.includes(normAdminPhone)) {
+        finalContacts = [normAdminPhone, ...finalContacts];
+      }
+    }
+
+    const savedCenter = dataService.saveCenter({
       id: editingCenter?.id,
       name,
       place,
@@ -178,11 +206,38 @@ export default function SuperAdminCentersPage() {
       endTime,
       effectiveDate,
       facultyName,
-      contactNumbers: cleanContacts,
+      contactNumbers: finalContacts,
+      adminPhones,
       defaultFee: Number(defaultFee),
       examMode,
       status,
     });
+
+    if (normAdminPhone) {
+      let existingUser = dataService.getUserByPhone(normAdminPhone);
+      if (existingUser) {
+        if (!existingUser.centerIds.includes(savedCenter.id)) {
+          existingUser.centerIds.push(savedCenter.id);
+        }
+        if (adminName.trim()) {
+          existingUser.name = adminName.trim();
+        }
+        dataService.saveUser(existingUser);
+      } else {
+        dataService.saveUser({
+          uid: 'admin-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 6),
+          phone: normAdminPhone,
+          name: adminName.trim() || 'Centre Admin',
+          role: 'CENTER_ADMIN',
+          centerIds: [savedCenter.id],
+          passwordPin: getDefaultPassword(normAdminPhone),
+          mustChangePassword: true,
+          isActive: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    }
 
     setIsModalOpen(false);
     refreshData();
@@ -401,17 +456,29 @@ export default function SuperAdminCentersPage() {
                         </div>
                       </div>
                     </div>
-                    <span
-                      className={`shrink-0 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                        c.status === 'Active'
-                          ? 'bg-cre-green-light text-cre-green border border-cre-green/30'
-                          : c.status === 'Pending Approval'
-                          ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                          : 'bg-red-50 text-red-700 border border-red-200'
-                      }`}
-                    >
-                      {c.status}
-                    </span>
+                    <div className="shrink-0 flex items-center">
+                      <select
+                        value={c.status}
+                        onChange={(e) => {
+                          const newStatus = e.target.value as CenterStatus;
+                          dataService.updateCenterStatus(c.id, newStatus);
+                          refreshData();
+                        }}
+                        className={`text-[10px] font-bold rounded-lg px-2 py-1 cursor-pointer border transition-colors outline-hidden ${
+                          c.status === 'Active'
+                            ? 'bg-emerald-50 text-emerald-800 border-emerald-300 focus:ring-1 focus:ring-emerald-500'
+                            : c.status === 'Pending Approval'
+                            ? 'bg-amber-50 text-amber-800 border-amber-300 focus:ring-1 focus:ring-amber-500'
+                            : 'bg-red-50 text-red-800 border-red-300 focus:ring-1 focus:ring-red-500'
+                        }`}
+                        title="Change centre status"
+                      >
+                        <option value="Active">Active</option>
+                        <option value="Pending Approval">Pending Approval</option>
+                        <option value="Suspended">Suspended</option>
+                        <option value="Archived">Archived</option>
+                      </select>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 my-3 p-3 bg-slate-50 rounded-xl text-[11px] border border-slate-100">
@@ -448,6 +515,32 @@ export default function SuperAdminCentersPage() {
                       {adminCount}/3 Admins
                     </span>
                   </div>
+
+                  {/* Default Contact as Admin Number & Direct WhatsApp Link */}
+                  {(() => {
+                    const primaryContact = (c.contactNumbers && c.contactNumbers[0]) || (c.adminPhones && c.adminPhones[0]) || '';
+                    const cleanPhone = primaryContact.replace(/\D/g, '');
+                    return (
+                      <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                        <div className="flex items-center text-slate-600 font-medium truncate max-w-[70%]">
+                          <Phone className="w-3.5 h-3.5 mr-1 text-slate-400 shrink-0" />
+                          <span className="truncate">Admin Contact: {primaryContact || 'Not set'}</span>
+                        </div>
+                        {cleanPhone ? (
+                          <a
+                            href={`https://wa.me/91${cleanPhone}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold text-[11px] transition-colors border border-emerald-200 shrink-0"
+                            title="Chat with Centre Admin on WhatsApp"
+                          >
+                            <MessageSquare className="w-3 h-3 text-emerald-600" />
+                            <span>WhatsApp</span>
+                          </a>
+                        ) : null}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Bottom Actions Bar */}
@@ -822,6 +915,48 @@ export default function SuperAdminCentersPage() {
                       <option value="Suspended">Suspended</option>
                       <option value="Archived">Archived</option>
                     </select>
+                  </div>
+                </div>
+
+                {/* Centre Administrator Assignment */}
+                <div className="p-4 bg-emerald-50/60 rounded-2xl border border-emerald-200 space-y-3">
+                  <div className="flex items-center space-x-2">
+                    <ShieldCheck className="w-4 h-4 text-cre-green shrink-0" />
+                    <div>
+                      <h4 className="text-xs font-bold text-cre-navy">Centre Administrator Account</h4>
+                      <p className="text-[11px] text-slate-500">
+                        Provide the primary Centre Admin&apos;s phone number and name. Default contact is set to this admin number.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        Admin Mobile Phone {editingCenter ? '(Optional)' : '*'}
+                      </label>
+                      <input
+                        type="tel"
+                        maxLength={10}
+                        value={adminPhone}
+                        onChange={(e) => setAdminPhone(e.target.value.replace(/\D/g, ''))}
+                        placeholder="10-digit mobile number"
+                        className="w-full px-3 py-2 text-xs border border-cre-border rounded-xl bg-white font-mono font-bold"
+                        required={!editingCenter}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        Admin Full Name {editingCenter ? '(Optional)' : '*'}
+                      </label>
+                      <input
+                        type="text"
+                        value={adminName}
+                        onChange={(e) => setAdminName(e.target.value)}
+                        placeholder="Full name of Centre Admin"
+                        className="w-full px-3 py-2 text-xs border border-cre-border rounded-xl bg-white font-bold"
+                        required={!editingCenter}
+                      />
+                    </div>
                   </div>
                 </div>
 
